@@ -1,0 +1,46 @@
+name: PayPal TrustShield AI — Continuous Integration & Security Pipeline
+
+on:
+  push:
+    branches: [ main, master, develop ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  test-and-verify:
+    name: Build, Lint, Security Audit & Automated Test Verification
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        node-version: [ 20.x, 22.x ]
+
+    steps:
+      - name: Checkout Code Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+
+      - name: Install Workspace Dependencies
+        run: npm ci
+
+      - name: TypeScript Compilation & Production Build
+        run: npm run build
+
+      - name: Static Security Scan (Zero Client-Side Secret Leak Audit)
+        run: |
+          echo "Scanning frontend distribution bundles for leaked credentials..."
+          ! grep -rn "PAYPAL_CLIENT_SECRET" frontend/src/ || exit 1
+          ! grep -rn "sk_live_" frontend/src/ || exit 1
+          echo "Security Scan Passed: 0 client-side credentials detected."
+
+      - name: Execute Vitest Automated Test Suites (100 Tests)
+        run: npm test
+
+      - name: Verify Docker Container Build
+        run: |
+          docker build -t paypal-trustshield-ai:test .

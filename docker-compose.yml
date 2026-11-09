@@ -1,0 +1,59 @@
+version: '3.8'
+
+services:
+  # PayPal TrustShield AI — Backend API & Multi-Agent Collective
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: paypal-trustshield-api
+    restart: unless-stopped
+    ports:
+      - "4000:4000"
+    environment:
+      - NODE_ENV=production
+      - PORT=4000
+      - PAYPAL_ENVIRONMENT=${PAYPAL_ENVIRONMENT:-sandbox}
+      - PAYPAL_CLIENT_ID=${PAYPAL_CLIENT_ID:-}
+      - PAYPAL_CLIENT_SECRET=${PAYPAL_CLIENT_SECRET:-}
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4000/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 1024M
+        reservations:
+          cpus: '0.5'
+          memory: 256M
+    networks:
+      - trustshield-net
+
+  # Frontend Presentation Layer (Reverse Proxy / Web UI)
+  frontend:
+    image: node:22-alpine
+    container_name: paypal-trustshield-ui
+    restart: unless-stopped
+    working_dir: /app
+    volumes:
+      - ./frontend:/app/frontend
+      - ./shared:/app/shared
+    ports:
+      - "5173:5173"
+    environment:
+      - VITE_API_BASE_URL=http://backend:4000
+    command: sh -c "cd frontend && npx vite --host 0.0.0.0 --port 5173"
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - trustshield-net
+
+networks:
+  trustshield-net:
+    driver: bridge
