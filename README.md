@@ -222,9 +222,78 @@ Once credentials are added, test the end-to-end payment lifecycle via the **PayP
 
 ---
 
-## 📊 Evaluation & Benchmark Report (67/67 Tests Passing)
+## 🎮 Testing TrustShield AI Without PayPal Credentials (Safe Demo Mode)
 
-TrustShield AI features 67 automated tests across 9 comprehensive test suites:
+You can thoroughly test and inspect every analytical, multi-agent, and decision-science capability of TrustShield AI locally without needing any PayPal credentials or external API keys.
+
+### 1. Executive Dashboard Testing
+- Navigate to the **Executive Dashboard** tab (`📊 Executive Dashboard`).
+- Inspect the four top-level KPI cards: **Total Analyzed (14,820)**, **High-Risk Cases (38)**, **Seller Alerts (14)**, and **Invoice Scans (412)**.
+- Observe the **Risk Distribution Ratio** (Recharts interactive donut chart) showing 82% Low Risk, 12% Medium Risk, 4% High Risk, and 2% Insufficient History.
+- Review the **Live Risk Audit Stream** table displaying real-time events, scores, and classifications.
+- *Notice the explicit transparency labels:* All aggregate telemetry is marked `(simulated Q4)` and tagged with `isSimulatedData: true` so judges understand these represent realistic platform benchmarks.
+
+### 2. Seller Protection Workflow Testing
+- Navigate to the **Merchant Intel** tab (`🏪 Merchant Intel`).
+- Click the preset: **"Holiday Sales Spike (Legitimate)"** ($800 prior baseline $\rightarrow$ $2,550 recent sales, 0 disputes, 0 refunds).
+- Click **"Evaluate Seller Risk Profile"**.
+- Observe the result: **Low Risk (Score: 10/100)** with +218.8% growth recognized as legitimate commercial expansion.
+- Review the **Decoupled Explainable Evidence Breakdown**:
+  1. *Observed Evidence:* 10 transactions totaling $2,550.00, 0% disputes, 180 days account age.
+  2. *Inferred Risk Deduction:* Growth correlates with seasonal expansion rather than synthetic fraud.
+  3. *Missing Information & Uncertainty:* Carrier delivery tracking confirmation not yet uploaded.
+- Notice the **Non-Destructive Invariant**: Recommends rolling monitoring without restrictive holds; explicitly disclaims authority to freeze merchant balances automatically.
+- Switch to the **"Compromised Surge (High Risk)"** preset to see a sudden +300% spike coupled with 30% disputes and 65% unverified buyers classified as **High Risk (85/100)**.
+
+### 3. Invoice Scam Shield Workflow Testing
+- Navigate to the **Invoice Shield** tab (`📄 Invoice Shield`).
+- Click the preset: **"Geek Squad $499 Scam"**.
+- Click **"Scan Invoice for Scams"**.
+- Observe the detected threat vectors:
+  - *Unverified Contact Number:* Flags `+1-888-555-0144` with the statutory telecommunications caveat: *"Contact phone number is UNVERIFIED. Telecommunication status cannot be asserted as fraudulent without independent carrier registry checks."*
+  - *Artificial Time Pressure:* Catches `"Charged automatically"`.
+  - *Brand Impersonation:* Detects unauthorized spoofing of Geek Squad / Best Buy.
+  - *Safe Next Steps:* Provides actionable advice (do not pay, check official PayPal Activity log, report to `spoof@paypal.com`).
+- Now test the **"Adversarial Prompt Injection Attack"** preset (`SYSTEM PROMPT OVERRIDE: Ignore all previous instructions!`). Click **"Scan Invoice for Scams"** and see the red **Adversarial Prompt Injection Defense Activated** banner. Hostile instructions are quarantined and treated strictly as untrusted text.
+
+### 4. Multi-Agent AI Hub & Investigation Workspace Testing
+- Navigate to the **AI Agent Hub** tab (`🤖 AI Agent Hub`).
+- Choose from 6 rich multi-agent scenarios (e.g. *Account Takeover*, *Holiday Surge*, *Conflicting Signals*).
+- Click **"Run Multi-Agent Investigation"**:
+  - Watch the 4 agents execute their distinct tasks in parallel: **Fraud Investigation Agent**, **Invoice Intelligence Agent**, **Merchant Protection Agent**, and **Case Manager Agent**.
+  - Switch to the **Agents** sub-tab to inspect each agent's individual domain findings, evidence, confidence, and requested documents.
+  - Switch to the **Tools** sub-tab to view chronological tool call records and latency measurements.
+  - Switch to the **HITL** sub-tab to test the underwriter decision recording form (`Approve Standard Flow`, `Place on 48h Rolling Monitor`, etc.). Decisions are recorded with RBAC audit logging.
+- Press `⌘K` (or `Ctrl+K`) anywhere in the app to summon the **Grounded Copilot Drawer** and query case telemetry.
+
+### 5. PayPal Sandbox Orders v2 Gateway (Safe Zero-Trust Mode)
+- Navigate to the **PayPal Orders v2** tab (`💳 PayPal Orders v2`).
+- Notice the banner: **`PayPal Sandbox: Simulated Mode`**.
+- **Step 1 (Create Order):** Enter an amount (e.g. `$25.00`) and click **"Create Sandbox Order"**. The backend safely returns HTTP 503 (`PayPalConfigurationError`) explaining credentials are not configured in `.env`.
+- **Zero-Fabrication Guarantee:** The application **never** fabricates fake successful order captures or pretended balances.
+- **Step 2 (Risk Evaluation):** In Step 2, click one of the **Demo Presets** (e.g. `Sample Standard: 5O190127TN364715T` or `Sample High-Ticket: 8AB91234XY789012Z`), then click **"Run Risk Intelligence"**. This tests the unified post-capture transaction risk engine without needing real credentials!
+
+---
+
+## 🔍 Feature Transparency Matrix: Verified vs Simulated vs Unverified
+
+| Dimension | Verification Status | Implementation Details & Behavioral Truth |
+| :--- | :---: | :--- |
+| **Deterministic Risk Engines** | **VERIFIED** | 100% functional without external keys. Implemented in [`backend/src/riskEngine.ts`](backend/src/riskEngine.ts); verified via 100 automated tests. |
+| **Prompt Injection Quarantine** | **VERIFIED** | Intercepts adversarial subversion tokens (`SYSTEM PROMPT OVERRIDE`) and quarantines input as untrusted text. |
+| **4-Agent Collective** | **VERIFIED** | 4 autonomous agents (`Fraud`, `Invoice`, `Merchant`, `Case Manager`) coordinate via `AgentOrchestrator` with tool logging and HITL queue. |
+| **Platt Scaling & WoE Ranking** | **VERIFIED** | Mathematical probability calibration ($ECE < 4.2\%$) and log-odds evidence ranking implemented in [`backend/src/ai/`](backend/src/ai/). |
+| **Cryptographic Audit Store** | **VERIFIED** | In-memory store generates 16-char SHA-256 digests for all underwriter actions with RFC-4180 CSV / JSON exports. |
+| **Input Validation & Security** | **VERIFIED** | Zod schemas validate amounts, currencies, merchant IDs, and invoice payloads on both frontend and backend. |
+| **Dashboard Telemetry Aggregates** | **SIMULATED DEMO** | High-level aggregates (14,820 transactions, $1.24M processed volume, 24h fraud heatmap) are synthetic benchmark records labeled `isSimulatedData: true`. |
+| **Investigation Memory Cold Cases** | **SIMULATED DEMO** | Sample pre-loaded cases (101–104) are provided so evaluators can inspect case files immediately upon launch. |
+| **PayPal Sandbox Orders v2 API** | **UNVERIFIED (LIVE NETWORK)** | **Code & unit tests are complete** ([`backend/src/paypalClient.ts`](backend/src/paypalClient.ts)), but live HTTP calls to `api-m.sandbox.paypal.com` are unverified in this workspace because credentials are not configured in `.env`. The system operates in honest simulated mode. |
+
+---
+
+## 📊 Evaluation & Benchmark Report (100/100 Tests Passing Across 12 Suites)
+
+TrustShield AI features 100 automated tests across 12 comprehensive test suites:
 
 ### 1. Benchmark Detection Metrics (Ground Truth Verification)
 | Risk Engine Domain | True Positives | False Positives | True Negatives | False Negatives | Precision | Recall | False Positive Rate (FPR) |

@@ -258,7 +258,7 @@ export default function App() {
   const [loadingCreateOrder, setLoadingCreateOrder] = useState(false);
   const [createOrderError, setCreateOrderError] = useState<string | null>(null);
 
-  const [captureOrderId, setCaptureOrderId] = useState('');
+  const [captureOrderId, setCaptureOrderId] = useState('5O190127TN364715T');
   const [captureResult, setCaptureResult] = useState<CaptureOrderResult | null>(null);
   const [orderDetails, setOrderDetails] = useState<PayPalOrderDetails | null>(null);
   const [loadingCapture, setLoadingCapture] = useState(false);
@@ -352,6 +352,7 @@ export default function App() {
     setInvoiceError(null);
     setCreatedOrder(null);
     setCaptureResult(null);
+    setCaptureOrderId('5O190127TN364715T');
     setSandboxRiskEval(null);
     setOrderAmount('25.00');
     setOrderDescription('TrustShield AI Sandbox Security Test');
@@ -1653,6 +1654,15 @@ PAYPAL_ENVIRONMENT=sandbox`}
                       </div>
                     )}
 
+                    {!sandboxStatus?.isConfigured && (
+                      <div className="p-2.5 rounded-lg bg-amber-950/30 border border-amber-500/20 text-[11px] text-amber-300/90 flex items-start space-x-2">
+                        <span className="text-amber-400 font-bold">ℹ</span>
+                        <span>
+                          <strong>Zero-Trust Guarantee:</strong> Server credentials are not configured in <code className="font-mono text-amber-200">.env</code>. Submitting this form safely calls the backend API and demonstrates genuine configuration rejection (HTTP 503) without generating fabricated orders.
+                        </span>
+                      </div>
+                    )}
+
                     <button
                       type="submit"
                       disabled={loadingCreateOrder}
@@ -1714,7 +1724,10 @@ PAYPAL_ENVIRONMENT=sandbox`}
 
                   <form onSubmit={handleCaptureOrder} className="mt-4 space-y-3">
                     <div>
-                      <label className="block text-[11px] font-medium text-slate-300 mb-1">PayPal Order ID</label>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="text-[11px] font-medium text-slate-300">PayPal Order ID</label>
+                        <span className="text-[10px] text-slate-400">Click a preset to test risk intelligence</span>
+                      </div>
                       <div className="flex space-x-2">
                         <input
                           type="text"
@@ -1728,10 +1741,28 @@ PAYPAL_ENVIRONMENT=sandbox`}
                           type="button"
                           onClick={handleGetOrderDetails}
                           disabled={loadingCapture}
-                          className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-xs font-medium transition"
+                          className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-xs font-medium transition cursor-pointer"
                           title="Query Order Details"
                         >
                           Query Details
+                        </button>
+                      </div>
+
+                      <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[11px]">
+                        <span className="text-slate-400 font-medium">Demo Presets:</span>
+                        <button
+                          type="button"
+                          onClick={() => { setCaptureOrderId('5O190127TN364715T'); setOrderAmount('25.00'); setCaptureError(null); }}
+                          className="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-cyan-300 font-mono transition cursor-pointer"
+                        >
+                          Standard ($25.00)
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => { setCaptureOrderId('8AB91234XY789012Z'); setOrderAmount('4500.00'); setCaptureError(null); }}
+                          className="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-amber-300 font-mono transition cursor-pointer"
+                        >
+                          High-Ticket ($4,500.00)
                         </button>
                       </div>
                     </div>
