@@ -400,6 +400,16 @@ app.get('/api/audit/logs', (_req: Request, res: Response) => {
   res.json({ totalLogs: logs.length, logs });
 });
 
+// Audit Center: Verify Cryptographic Checksum Integrity
+app.get('/api/audit/verify', (_req: Request, res: Response) => {
+  const verification = auditLogger.verifyIntegrity();
+  res.json({
+    ...verification,
+    algorithm: 'SHA-256',
+    verifiedAt: new Date().toISOString()
+  });
+});
+
 // Audit Center: Export Audit Logs (CSV or JSON)
 app.get('/api/audit/export', (req: Request, res: Response) => {
   const format = req.query.format === 'csv' ? 'csv' : 'json';
@@ -555,7 +565,18 @@ app.use((err: unknown, req: Request, res: Response, _next: NextFunction) => {
 const PORT = process.env.PORT || 4000;
 
 if (process.env.NODE_ENV !== 'test') {
-  app.listen(PORT, () => {
+  const server = app.listen(PORT, () => {
     console.log(`[TrustShield AI Backend] Listening securely on http://localhost:${PORT}`);
+  });
+
+  server.on('error', (err: NodeJS.ErrnoException) => {
+    if (err.code === 'EADDRINUSE') {
+      console.error(`[TrustShield AI Backend] Port ${PORT} is already in use by another process.`);
+      console.error(`[TrustShield AI Backend] Terminate the existing process on port ${PORT} or set PORT=<port> in your environment.`);
+      process.exit(1);
+    } else {
+      console.error('[TrustShield AI Backend] Server listener error:', err);
+      process.exit(1);
+    }
   });
 }

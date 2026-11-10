@@ -48,46 +48,36 @@ export const CopilotDrawer: React.FC<CopilotDrawerProps> = ({
   // Auto-scroll to bottom of chat
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, isLoading]);
+  }, [messages]);
 
-  // Update messages when active case changes
+  // Context switch notification when activeCase changes
   useEffect(() => {
     if (activeCase && activeCase.caseId !== lastCaseIdRef.current) {
       lastCaseIdRef.current = activeCase.caseId;
-      const caseId = activeCase.caseId;
-      const score = activeCase.overallRiskScore;
-      const cat = activeCase.overallRiskCategory;
-      const merchant = activeCase.merchantId || 'Documentary Entity';
-      const status = activeCase.humanInTheLoop.status;
-      const timer = setTimeout(() => {
-        setMessages(prev => [
-          ...prev,
-          {
-            id: `case-focus-${Date.now()}`,
-            sender: 'copilot',
-            text: `🔍 **Context Switch:** Now focused on **Case ${caseId}**.\n• Risk Score: **${score}/100** (${cat})\n• Merchant: **${merchant}**\n• HITL Status: **${status}**`,
-            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-            actionSuggestions: [
-              'Summarize this investigation',
-              'Explain key risk drivers',
-              'Evaluate counter-hypotheses',
-              'Suggest next underwriting actions'
-            ]
-          }
-        ]);
-      }, 0);
-      return () => clearTimeout(timer);
+      setMessages(prev => [
+        ...prev,
+        {
+          id: `switch-${Date.now()}`,
+          sender: 'copilot',
+          text: `🔄 Switched focus to **Case ${activeCase.caseId}** (${activeCase.overallRiskCategory}, Score: ${activeCase.overallRiskScore}/100).\nVerdict: "${activeCase.finalVerdict || activeCase.humanReadableExplanation}"\n\nHow can I help with this case?`,
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          actionSuggestions: [
+            'Summarize case findings',
+            'Check for policy violations',
+            'Assess false positive probability'
+          ]
+        }
+      ]);
     }
   }, [activeCase]);
 
-  const handleSendMessage = async (textToSend: string) => {
-    const query = textToSend.trim();
-    if (!query || isLoading) return;
+  const handleSendMessage = async (userText: string) => {
+    if (!userText.trim() || isLoading) return;
 
     const userMsg: ChatMessage = {
       id: `user-${Date.now()}`,
       sender: 'user',
-      text: query,
+      text: userText,
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     };
 
@@ -98,14 +88,16 @@ export const CopilotDrawer: React.FC<CopilotDrawerProps> = ({
     try {
       const response = await fetch('/api/copilot/chat', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-user-role': 'underwriter',
-          'x-user-id': 'SEC-USER-001'
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          message: query,
-          caseId: activeCase?.caseId
+          caseId: activeCase?.caseId || 'CASE-MEM-2026-001',
+          query: userText,
+          investigationContext: activeCase ? {
+            merchantId: activeCase.merchantId,
+            riskScore: activeCase.overallRiskScore,
+            category: activeCase.overallRiskCategory,
+            primaryDriver: activeCase.finalVerdict || activeCase.humanReadableExplanation
+          } : undefined
         })
       });
 
@@ -143,22 +135,22 @@ export const CopilotDrawer: React.FC<CopilotDrawerProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 overflow-hidden flex justify-end bg-black/60 backdrop-blur-sm transition-opacity">
-      <div className="w-full max-w-lg bg-slate-900 border-l border-slate-800 flex flex-col h-full shadow-2xl animate-slide-left">
+    <div className="fixed inset-0 z-50 overflow-hidden flex justify-end bg-black/40 backdrop-blur-sm transition-opacity">
+      <div className="w-full max-w-lg bg-white border-l border-[#e1e2e4] flex flex-col h-full shadow-2xl animate-slide-left">
         {/* Drawer Header */}
-        <div className="p-4 border-b border-slate-800 bg-slate-950/80 flex items-center justify-between">
+        <div className="p-4 border-b border-[#e1e2e4] bg-[#f8f9fb] flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-500 flex items-center justify-center text-white shadow-lg">
-              <span className="font-black text-sm">AI</span>
+            <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center text-white shadow-sm">
+              <span className="material-symbols-outlined text-[18px]">smart_toy</span>
             </div>
             <div>
-              <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                PayPal Copilot
-                <span className="px-1.5 py-0.2 rounded text-[10px] font-semibold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+              <h3 className="text-sm font-bold text-[#191c1e] flex items-center gap-2">
+                TrustShield Copilot
+                <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
                   Grounded
                 </span>
               </h3>
-              <p className="text-xs text-slate-400">
+              <p className="text-xs text-[#434655]">
                 {activeCase ? `Focused on Case ${activeCase.caseId}` : 'Platform Wide Investigation Mode'}
               </p>
             </div>
@@ -166,24 +158,24 @@ export const CopilotDrawer: React.FC<CopilotDrawerProps> = ({
           <button
             onClick={onClose}
             aria-label="Close Copilot Drawer"
-            className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors"
+            className="p-1.5 text-[#434655] hover:text-[#191c1e] rounded-lg hover:bg-slate-200/50 transition-colors cursor-pointer"
           >
-            <span className="text-xl">×</span>
+            <span className="material-symbols-outlined text-[20px]">close</span>
           </button>
         </div>
 
         {/* Chat History */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-4">
+        <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-white">
           {messages.map(msg => (
             <div
               key={msg.id}
               className={`flex flex-col ${msg.sender === 'user' ? 'items-end' : 'items-start'}`}
             >
               <div
-                className={`max-w-[88%] rounded-2xl px-4 py-3 text-xs leading-relaxed ${
+                className={`max-w-[88%] rounded-xl px-4 py-3 text-xs leading-relaxed ${
                   msg.sender === 'user'
-                    ? 'bg-blue-600 text-white rounded-br-none shadow-md'
-                    : 'bg-slate-800/90 text-slate-200 border border-slate-700/80 rounded-bl-none shadow-sm'
+                    ? 'bg-blue-600 text-white rounded-br-none shadow-sm'
+                    : 'bg-[#f2f4f6] text-[#191c1e] border border-[#e1e2e4] rounded-bl-none shadow-sm'
                 }`}
               >
                 {/* Text Content */}
@@ -191,11 +183,11 @@ export const CopilotDrawer: React.FC<CopilotDrawerProps> = ({
 
                 {/* Grounding Evidence Citations */}
                 {msg.citedEvidence && msg.citedEvidence.length > 0 && (
-                  <div className="mt-2.5 pt-2 border-t border-slate-700/60">
-                    <span className="text-[10px] uppercase font-bold text-slate-400 block mb-1">
+                  <div className="mt-2.5 pt-2 border-t border-[#e1e2e4]">
+                    <span className="text-[10px] uppercase font-semibold text-[#434655] block mb-1">
                       Cited Evidence Sources:
                     </span>
-                    <ul className="space-y-0.5 text-[11px] text-cyan-300">
+                    <ul className="space-y-0.5 text-[11px] text-blue-700 font-mono">
                       {msg.citedEvidence.map((ev, i) => (
                         <li key={i} className="flex items-start gap-1">
                           <span>›</span> <span>{ev}</span>
@@ -207,7 +199,7 @@ export const CopilotDrawer: React.FC<CopilotDrawerProps> = ({
               </div>
 
               {/* Timestamp */}
-              <span className="text-[10px] text-slate-500 mt-1 px-1">{msg.timestamp}</span>
+              <span className="text-[10px] text-[#737686] mt-1 px-1">{msg.timestamp}</span>
 
               {/* Suggested Quick Action Chips */}
               {msg.actionSuggestions && msg.actionSuggestions.length > 0 && (
@@ -217,7 +209,7 @@ export const CopilotDrawer: React.FC<CopilotDrawerProps> = ({
                       key={idx}
                       onClick={() => handleSendMessage(act)}
                       disabled={isLoading}
-                      className="text-[11px] px-2.5 py-1 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 transition-colors text-left"
+                      className="text-[11px] px-2.5 py-1 rounded-full bg-[#f8f9fb] hover:bg-[#edeef0] text-[#191c1e] border border-[#e1e2e4] transition-colors text-left shadow-xs cursor-pointer"
                     >
                       💡 {act}
                     </button>
@@ -229,11 +221,11 @@ export const CopilotDrawer: React.FC<CopilotDrawerProps> = ({
 
           {/* Loading indicator */}
           {isLoading && (
-            <div className="flex items-center gap-2 text-xs text-slate-400 p-2">
-              <span className="w-2 h-2 rounded-full bg-blue-500 animate-bounce"></span>
-              <span className="w-2 h-2 rounded-full bg-blue-500 animate-bounce delay-100"></span>
-              <span className="w-2 h-2 rounded-full bg-blue-500 animate-bounce delay-200"></span>
-              <span>Copilot cross-referencing case telemetry & SOPs...</span>
+            <div className="flex items-center gap-2 text-xs text-[#434655] p-2 bg-[#f8f9fb] rounded-lg">
+              <span className="w-2 h-2 rounded-full bg-blue-600 animate-bounce"></span>
+              <span className="w-2 h-2 rounded-full bg-blue-600 animate-bounce delay-100"></span>
+              <span className="w-2 h-2 rounded-full bg-blue-600 animate-bounce delay-200"></span>
+              <span>Copilot cross-referencing case telemetry &amp; SOPs...</span>
             </div>
           )}
 
@@ -241,7 +233,7 @@ export const CopilotDrawer: React.FC<CopilotDrawerProps> = ({
         </div>
 
         {/* Input Bar */}
-        <div className="p-4 border-t border-slate-800 bg-slate-950/90">
+        <div className="p-4 border-t border-[#e1e2e4] bg-[#f8f9fb]">
           <form
             onSubmit={e => {
               e.preventDefault();
@@ -254,17 +246,17 @@ export const CopilotDrawer: React.FC<CopilotDrawerProps> = ({
               value={inputPrompt}
               onChange={e => setInputPrompt(e.target.value)}
               placeholder={activeCase ? `Ask Copilot about Case ${activeCase.caseId}...` : "Ask Copilot about PayPal fraud patterns..."}
-              className="flex-1 bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+              className="flex-1 bg-white border border-[#e1e2e4] rounded-lg px-3.5 py-2 text-xs text-[#191c1e] placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-blue-600 shadow-xs"
             />
             <button
               type="submit"
               disabled={isLoading || !inputPrompt.trim()}
-              className="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white font-medium text-xs px-4 py-2.5 rounded-xl transition-colors shadow-md"
+              className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-medium text-xs px-4 py-2 rounded-lg transition-colors shadow-sm cursor-pointer"
             >
               Send
             </button>
           </form>
-          <div className="flex items-center justify-between mt-2 text-[10px] text-slate-500">
+          <div className="flex items-center justify-between mt-2 text-[10px] text-[#737686]">
             <span>Press Enter to send · Grounded in case telemetry</span>
             <span>Zero hallucination policy</span>
           </div>

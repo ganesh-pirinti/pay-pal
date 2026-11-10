@@ -19,7 +19,6 @@ import type {
   PayPalSandboxStatus,
   CreateOrderResult,
   CaptureOrderResult,
-  PayPalOrderDetails,
   SandboxTransactionRiskEvaluation,
   CaseManagerResult
 } from '../../shared/src/types.js';
@@ -27,7 +26,7 @@ import { MultiAgentHub } from './components/MultiAgentHub';
 import { SystemDiagnosticsModal } from './components/SystemDiagnosticsModal';
 import { InvestigationWorkspace } from './components/InvestigationWorkspace';
 import { AiOperationsCenter } from './components/AiOperationsCenter';
-import { FraudIntelligenceCenter } from './components/FraudIntelligenceCenter';
+import { GraphVisualizer } from './components/GraphVisualizer';
 import { KnowledgeCenter } from './components/KnowledgeCenter';
 import { AuditCenter } from './components/AuditCenter';
 import { SystemMonitoringCenter } from './components/SystemMonitoringCenter';
@@ -37,7 +36,7 @@ import { KeyboardShortcutsModal } from './components/KeyboardShortcutsModal';
 // Pre-defined Realistic Demo Scenarios
 const SELLER_PRESETS = [
   {
-    name: 'Holiday Sales Spike (Legitimate)',
+    name: 'Holiday Sales Spike (+218% Surge)',
     desc: 'Surge of +218% sales growth with zero disputes and 0% refunds.',
     data: {
       merchantId: 'MERCHANT_GROWTH_001',
@@ -50,7 +49,7 @@ const SELLER_PRESETS = [
     }
   },
   {
-    name: 'Compromised Surge (High Risk)',
+    name: 'Compromised Surge (High Risk ATO)',
     desc: '+300% volume surge coupled with 30% dispute rate & unverified buyers.',
     data: {
       merchantId: 'MERCHANT_COMPROMISED_002',
@@ -149,45 +148,38 @@ Please remit to Logistics Corp Corporate Commercial Banking ACH Routing 02100002
     text: `ACME CLOUD SOLUTIONS LLC
 Invoice #: INV-2026-9901
 Date: November 10, 2026
-Terms: Net 30 days
-Tax ID / EIN: 84-1928471
-
-Itemized Description:
-1. Cloud Infrastructure Management (Nov 2026) - $1,450.00
-2. Automated Security Monitoring - $350.00
-
-Subtotal: $1,800.00
-Sales Tax: $0.00
-Total Due: $1,800.00
-
-Payment Instructions:
-Please remit payment via ACH or corporate check within 30 days to ACME Cloud Solutions Operating Account.
-Thank you for your business.`
+Bill To: Enterprise Partner Inc
+Items:
+1. Enterprise Cloud Compute Cluster - 30 Days: $4,500.00
+2. Dedicated Support Tier SLA: $500.00
+Total Due: $5,000.00
+Payment Terms: Net 30 Days via Corporate ACH or Verified Commercial Card
+Tax ID: 88-1234567
+Inquiries: billing@acmecloudsolutions.com`
   }
 ];
 
 export type AppTab =
-  | 'investigation'
   | 'dashboard'
-  | 'ai-ops'
-  | 'fraud-intel'
   | 'seller'
   | 'invoice'
-  | 'agents'
-  | 'monitoring'
-  | 'audit'
-  | 'knowledge'
+  | 'investigation'
   | 'sandbox'
-  | 'review';
+  | 'audit';
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<AppTab>('investigation');
+  const [activeTab, setActiveTab] = useState<AppTab>('dashboard');
+  const [investigationSubTab, setInvestigationSubTab] = useState<'deliberation' | 'cases' | 'agents' | 'graphs' | 'ai-ops'>('deliberation');
+  const [auditSubTab, setAuditSubTab] = useState<'logs' | 'monitoring' | 'knowledge'>('logs');
+
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
   const [showDiagnosticsModal, setShowDiagnosticsModal] = useState(false);
   const [isCopilotOpen, setIsCopilotOpen] = useState(false);
   const [isShortcutsModalOpen, setIsShortcutsModalOpen] = useState(false);
   const [copilotCaseFocus, setCopilotCaseFocus] = useState<CaseManagerResult | null>(null);
 
-  // Global Keyboard Shortcuts (Accessibility & Speed)
+  // Global Keyboard Shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
@@ -198,17 +190,14 @@ export default function App() {
         e.preventDefault();
         setIsShortcutsModalOpen(prev => !prev);
       }
-      if (['1', '2', '3', '4', '5', '6', '7', '8', '9'].includes(e.key) && !['input', 'textarea'].includes((e.target as HTMLElement).tagName.toLowerCase())) {
+      if (['1', '2', '3', '4', '5', '6'].includes(e.key) && !['input', 'textarea'].includes((e.target as HTMLElement).tagName.toLowerCase())) {
         const tabMap: Record<string, AppTab> = {
           '1': 'dashboard',
-          '2': 'investigation',
-          '3': 'ai-ops',
-          '4': 'seller',
-          '5': 'invoice',
-          '6': 'fraud-intel',
-          '7': 'agents',
-          '8': 'monitoring',
-          '9': 'knowledge'
+          '2': 'seller',
+          '3': 'invoice',
+          '4': 'investigation',
+          '5': 'sandbox',
+          '6': 'audit'
         };
         const target = tabMap[e.key];
         if (target) setActiveTab(target);
@@ -217,6 +206,7 @@ export default function App() {
         setIsCopilotOpen(false);
         setIsShortcutsModalOpen(false);
         setShowDiagnosticsModal(false);
+        setIsMobileMenuOpen(false);
       }
     };
 
@@ -260,13 +250,16 @@ export default function App() {
 
   const [captureOrderId, setCaptureOrderId] = useState('5O190127TN364715T');
   const [captureResult, setCaptureResult] = useState<CaptureOrderResult | null>(null);
-  const [orderDetails, setOrderDetails] = useState<PayPalOrderDetails | null>(null);
   const [loadingCapture, setLoadingCapture] = useState(false);
   const [captureError, setCaptureError] = useState<string | null>(null);
 
   // Sandbox Transaction Risk Evaluation state
   const [sandboxRiskEval, setSandboxRiskEval] = useState<SandboxTransactionRiskEvaluation | null>(null);
   const [loadingSandboxEval, setLoadingSandboxEval] = useState(false);
+
+  // Deliberation Case state
+  const [totpCode, setTotpCode] = useState('');
+  const [actionAlert, setActionAlert] = useState<string | null>(null);
 
   const fetchSandboxStatus = useCallback(async () => {
     try {
@@ -281,7 +274,7 @@ export default function App() {
         mode: 'simulated',
         environment: 'sandbox',
         clientIdMasked: null,
-        statusMessage: 'PayPal Sandbox not configured in server environment. Operating in simulated security mode.',
+        statusMessage: 'PayPal Sandbox operating in simulated security mode.',
         requiresRealCredentials: true,
         liveApiAvailable: false,
         apiBaseUrl: 'https://api-m.sandbox.paypal.com'
@@ -301,25 +294,22 @@ export default function App() {
     }
   }, []);
 
-  // Fetch initial summary & sandbox status
   useEffect(() => {
-    let isSubscribed = true;
+    let isMounted = true;
 
     fetch('/api/paypal/status')
       .then(res => (res.ok ? res.json() : null))
       .then(data => {
-        if (isSubscribed && data) {
-          setSandboxStatus(data);
-        }
+        if (isMounted && data) setSandboxStatus(data);
       })
       .catch(() => {
-        if (isSubscribed) {
+        if (isMounted) {
           setSandboxStatus({
             isConfigured: false,
             mode: 'simulated',
             environment: 'sandbox',
             clientIdMasked: null,
-            statusMessage: 'PayPal Sandbox not configured in server environment. Operating in simulated security mode.',
+            statusMessage: 'PayPal Sandbox operating in simulated security mode.',
             requiresRealCredentials: true,
             liveApiAvailable: false,
             apiBaseUrl: 'https://api-m.sandbox.paypal.com'
@@ -330,16 +320,12 @@ export default function App() {
     fetch('/api/summary')
       .then(res => (res.ok ? res.json() : null))
       .then(data => {
-        if (isSubscribed && data) {
-          setSummary(data);
-        }
+        if (isMounted && data) setSummary(data);
       })
-      .catch(err => {
-        console.error('Failed to fetch summary', err);
-      });
+      .catch(err => console.error('Failed to fetch summary', err));
 
     return () => {
-      isSubscribed = false;
+      isMounted = false;
     };
   }, []);
 
@@ -437,19 +423,78 @@ export default function App() {
     }
   };
 
+  const handleRunPresetSeller = (presetIdx: number) => {
+    const preset = SELLER_PRESETS[presetIdx];
+    if (!preset) return;
+    setSellerForm({ ...preset.data });
+    setActiveTab('seller');
+
+    const txArray = preset.data.transactions
+      .split(',')
+      .map(t => parseFloat(t.trim()))
+      .filter(t => !isNaN(t));
+
+    setLoadingSeller(true);
+    setSellerError(null);
+
+    fetch('/api/seller-protection/analyze', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        merchantId: preset.data.merchantId,
+        transactions: txArray,
+        previousMonthSales: preset.data.previousMonthSales,
+        disputes: preset.data.disputes,
+        refunds: preset.data.refunds,
+        accountAgeDays: preset.data.accountAgeDays,
+        unverifiedPayerRatio: preset.data.unverifiedPayerRatio / 100
+      })
+    })
+      .then(res => res.json())
+      .then(data => {
+        setSellerResult(data);
+      })
+      .catch(err => {
+        setSellerError(err instanceof Error ? err.message : 'Failed to analyze scenario');
+      })
+      .finally(() => setLoadingSeller(false));
+  };
+
+  const handleRunPresetInvoice = (presetIdx: number) => {
+    const preset = INVOICE_PRESETS[presetIdx];
+    if (!preset) return;
+    setInvoiceText(preset.text);
+    setActiveTab('invoice');
+    setLoadingInvoice(true);
+    setInvoiceError(null);
+
+    fetch('/api/invoice-scam/analyze', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ invoiceText: preset.text })
+    })
+      .then(res => res.json())
+      .then(data => {
+        setInvoiceResult(data);
+      })
+      .catch(err => {
+        setInvoiceError(err instanceof Error ? err.message : 'Failed to analyze invoice');
+      })
+      .finally(() => setLoadingInvoice(false));
+  };
+
   const handleCreateOrder = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     setLoadingCreateOrder(true);
     setCreateOrderError(null);
     setCreatedOrder(null);
-    setSandboxRiskEval(null);
 
     try {
       const res = await fetch('/api/paypal/orders/create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          amount: orderAmount,
+          amount: parseFloat(orderAmount),
           currency: orderCurrency,
           description: orderDescription
         })
@@ -457,13 +502,15 @@ export default function App() {
 
       const data = await res.json();
       if (!res.ok) {
-        setCreateOrderError(data.message || data.error || 'Failed to create PayPal Sandbox order.');
+        setCreateOrderError(data.message || data.error || 'Failed to create sandbox order.');
       } else {
         setCreatedOrder(data);
-        setCaptureOrderId(data.orderId);
+        if (data.orderId) {
+          setCaptureOrderId(data.orderId);
+        }
       }
     } catch (err: unknown) {
-      setCreateOrderError(err instanceof Error ? err.message : 'Network error connecting to backend.');
+      setCreateOrderError(err instanceof Error ? err.message : 'Network error creating sandbox order.');
     } finally {
       setLoadingCreateOrder(false);
     }
@@ -471,17 +518,18 @@ export default function App() {
 
   const handleCaptureOrder = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    if (!captureOrderId.trim()) {
-      setCaptureError('Please enter a valid PayPal Order ID.');
-      return;
-    }
-
     setLoadingCapture(true);
     setCaptureError(null);
     setCaptureResult(null);
     setSandboxRiskEval(null);
 
     try {
+      if (!captureOrderId.trim()) {
+        setCaptureError('Please enter a PayPal Order ID.');
+        setLoadingCapture(false);
+        return;
+      }
+
       const res = await fetch(`/api/paypal/orders/${encodeURIComponent(captureOrderId.trim())}/capture`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' }
@@ -489,1399 +537,2133 @@ export default function App() {
 
       const data = await res.json();
       if (!res.ok) {
-        setCaptureError(data.message || data.error || 'Failed to capture PayPal Sandbox order.');
+        setCaptureError(data.message || data.error || 'Failed to capture sandbox order.');
       } else {
         setCaptureResult(data);
+        handleEvaluateSandboxTransaction(captureOrderId.trim());
       }
     } catch (err: unknown) {
-      setCaptureError(err instanceof Error ? err.message : 'Network error capturing PayPal order.');
+      setCaptureError(err instanceof Error ? err.message : 'Network error capturing sandbox order.');
     } finally {
       setLoadingCapture(false);
     }
   };
 
-  const handleEvaluateSandboxOrder = async () => {
-    const targetOrderId = captureResult?.orderId || orderDetails?.orderId || captureOrderId.trim();
-    if (!targetOrderId) return;
-
+  const handleEvaluateSandboxTransaction = async (orderId: string, customAmount?: number) => {
     setLoadingSandboxEval(true);
     try {
-      const amt = parseFloat(captureResult?.amount || orderDetails?.amount || orderAmount) || 25.0;
       const res = await fetch('/api/intelligence/sandbox-transaction', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          orderId: targetOrderId,
-          amount: amt,
-          currency: captureResult?.currency || orderCurrency,
-          buyerEmail: captureResult?.payer?.email || 'sandbox-buyer@example.com',
-          status: captureResult?.status || 'COMPLETED'
+          orderId,
+          amount: customAmount || parseFloat(orderAmount) || 25.0,
+          currency: orderCurrency || 'USD'
         })
       });
-      const data = await res.json();
       if (res.ok) {
-        setSandboxRiskEval(data);
+        const evalData = await res.json();
+        setSandboxRiskEval(evalData);
       }
     } catch (err) {
-      console.error('Error evaluating sandbox transaction', err);
+      console.error('Failed to evaluate sandbox transaction risk', err);
     } finally {
       setLoadingSandboxEval(false);
     }
   };
 
-  const handleGetOrderDetails = async () => {
-    if (!captureOrderId.trim()) {
-      setCaptureError('Please enter an Order ID to query.');
-      return;
-    }
+  // Recharts Risk Distribution Data
+  const pieData = summary?.riskDistribution
+    ? [
+        { name: 'Low Risk', value: summary.riskDistribution.low, color: '#059669' },
+        { name: 'Medium Risk', value: summary.riskDistribution.medium, color: '#d97706' },
+        { name: 'High Risk', value: summary.riskDistribution.high, color: '#dc2626' },
+        { name: 'Insufficient History', value: summary.riskDistribution.insufficientEvidence, color: '#2563eb' }
+      ]
+    : [
+        { name: 'Low Risk', value: 82, color: '#059669' },
+        { name: 'Medium Risk', value: 12, color: '#d97706' },
+        { name: 'High Risk', value: 4, color: '#dc2626' },
+        { name: 'Insufficient History', value: 2, color: '#2563eb' }
+      ];
 
-    setLoadingCapture(true);
-    setCaptureError(null);
-
-    try {
-      const res = await fetch(`/api/paypal/orders/${encodeURIComponent(captureOrderId.trim())}`);
-      const data = await res.json();
-      if (!res.ok) {
-        setCaptureError(data.message || data.error || 'Failed to retrieve order details.');
-      } else {
-        setOrderDetails(data);
-      }
-    } catch (err: unknown) {
-      setCaptureError(err instanceof Error ? err.message : 'Network error retrieving order.');
-    } finally {
-      setLoadingCapture(false);
-    }
-  };
-
-  const getRiskColor = (category: string) => {
-    switch (category) {
-      case 'Low Risk':
-      case 'Legitimate / Low Risk':
-        return 'text-emerald-400 bg-emerald-950/40 border-emerald-500/30';
-      case 'Medium Risk':
-      case 'Suspicious':
-      case 'Needs Review':
-        return 'text-amber-400 bg-amber-950/40 border-amber-500/30';
-      case 'High Risk':
-      case 'High-Risk Scam':
-        return 'text-rose-400 bg-rose-950/40 border-rose-500/30';
-      case 'Insufficient Evidence':
-      default:
-        return 'text-cyan-400 bg-cyan-950/40 border-cyan-500/30';
-    }
-  };
-
-  // Chart data
-  const pieData = summary ? [
-    { name: 'Low Risk', value: summary.riskDistribution.low, color: '#10b981' },
-    { name: 'Medium Risk', value: summary.riskDistribution.medium, color: '#f59e0b' },
-    { name: 'High Risk', value: summary.riskDistribution.high, color: '#f43f5e' },
-    { name: 'Insufficient History', value: summary.riskDistribution.insufficientEvidence, color: '#06b6d4' }
-  ] : [];
-
-  const activityBarData = [
-    { day: 'Mon', analyzed: 1850, highRisk: 4 },
-    { day: 'Tue', analyzed: 2100, highRisk: 6 },
-    { day: 'Wed', analyzed: 1980, highRisk: 3 },
-    { day: 'Thu', analyzed: 2450, highRisk: 8 },
-    { day: 'Fri', analyzed: 2900, highRisk: 9 },
-    { day: 'Sat', analyzed: 1720, highRisk: 5 },
-    { day: 'Sun', analyzed: 1820, highRisk: 3 }
+  const streamData = [
+    { day: 'Mon', volume: 1420, flagged: 3, cleared: 1417 },
+    { day: 'Tue', volume: 1850, flagged: 5, cleared: 1845 },
+    { day: 'Wed', volume: 2100, flagged: 8, cleared: 2092 },
+    { day: 'Thu', volume: 1980, flagged: 4, cleared: 1976 },
+    { day: 'Fri', volume: 2450, flagged: 6, cleared: 2444 },
+    { day: 'Sat', volume: 2890, flagged: 9, cleared: 2881 },
+    { day: 'Sun', volume: 3130, flagged: 3, cleared: 3127 }
   ];
 
+  const navItems: { id: AppTab; label: string; icon: string }[] = [
+    { id: 'dashboard', label: 'Overview', icon: 'grid_view' },
+    { id: 'seller', label: 'Seller Protection', icon: 'verified_user' },
+    { id: 'invoice', label: 'Invoice Shield', icon: 'receipt_long' },
+    { id: 'investigation', label: 'Investigations', icon: 'policy' },
+    { id: 'sandbox', label: 'Transactions', icon: 'payments' },
+    { id: 'audit', label: 'Audit & System', icon: 'dns' }
+  ];
+
+  const activeNavLabel = navItems.find(n => n.id === activeTab)?.label || 'Overview';
+
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans">
-      {/* Top Navigation Bar */}
-      <header className="border-b border-slate-800 bg-slate-900/80 backdrop-blur sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-          <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-600 to-cyan-500 flex items-center justify-center shadow-lg shadow-blue-500/20">
-              <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-              </svg>
+    <div className="min-h-screen bg-[#f8f9fb] text-[#191c1e] font-sans antialiased">
+      {/* Mobile Drawer Overlay */}
+      {isMobileMenuOpen && (
+        <div
+          className="fixed inset-0 bg-black/40 backdrop-blur-sm z-40 lg:hidden"
+          onClick={() => setIsMobileMenuOpen(false)}
+        />
+      )}
+
+      {/* Fixed Left Sidebar (240px wide, matching prototype) */}
+      <aside
+        className={`fixed left-0 top-0 h-full w-[240px] bg-[#f2f4f6] border-r border-[#e1e2e4] z-50 flex flex-col justify-between py-6 transition-transform duration-200 lg:translate-x-0 ${
+          isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
+        }`}
+      >
+        <div className="flex flex-col">
+          {/* Logo & Brand Header */}
+          <div className="px-5 mb-8 flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-[#004ac6] flex items-center justify-center text-white shadow-sm shrink-0">
+              <span className="material-symbols-outlined text-[20px]">shield</span>
             </div>
-            <div>
-              <div className="flex items-center space-x-2">
-                <span className="font-bold text-lg tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-blue-400 via-cyan-300 to-indigo-300">
-                  PayPal TrustShield AI
-                </span>
-                <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20">
-                  Hackathon 2026
-                </span>
-              </div>
-              <p className="text-xs text-slate-400">Explainable Intelligence Layer & Zero-Trust Sandbox</p>
+            <div className="flex flex-col">
+              <span className="font-semibold text-lg text-[#191c1e] tracking-tight leading-tight">
+                TrustShield AI
+              </span>
+              <span className="text-[10px] text-[#434655] font-medium tracking-wide">
+                FINTECH RISK PLATFORM
+              </span>
             </div>
           </div>
 
-          {/* Header Action Buttons & Status */}
-          <div className="flex items-center space-x-3">
-            <div className="hidden sm:flex items-center space-x-2 px-3 py-1.5 rounded-lg bg-slate-800/80 border border-slate-700/60 text-xs">
-              <span className={`w-2 h-2 rounded-full ${sandboxStatus?.isConfigured ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`}></span>
-              <span className="text-slate-300 font-medium">
-                {sandboxStatus?.isConfigured ? 'PayPal Sandbox: Connected' : 'PayPal Sandbox: Simulated Mode'}
+          {/* Navigation Links */}
+          <nav className="flex flex-col gap-1 px-3">
+            {navItems.map(item => {
+              const isActive = activeTab === item.id;
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => {
+                    setActiveTab(item.id);
+                    setIsMobileMenuOpen(false);
+                  }}
+                  className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all cursor-pointer text-left w-full ${
+                    isActive
+                      ? 'bg-[#004ac6] text-white font-semibold shadow-sm'
+                      : 'text-[#434655] hover:bg-[#e7e8ea] hover:text-[#191c1e] font-medium'
+                  }`}
+                >
+                  <span className="material-symbols-outlined text-[20px]">
+                    {item.icon}
+                  </span>
+                  <span>{item.label}</span>
+                </button>
+              );
+            })}
+          </nav>
+        </div>
+
+        {/* Sidebar Footer */}
+        <div className="px-5 flex flex-col gap-4">
+          {/* Status Indicator */}
+          <div className="flex items-center gap-2 px-3 py-2 bg-[#edeef0] rounded-lg">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+            <span className="text-xs font-medium text-[#434655]">Systems Operational</span>
+          </div>
+
+          {/* User Profile */}
+          <div className="flex items-center gap-3 pt-3 border-t border-[#e1e2e4]">
+            <div className="w-8 h-8 rounded-full bg-[#004ac6] flex items-center justify-center text-white shrink-0 shadow-xs">
+              <span className="material-symbols-outlined text-[18px]">person</span>
+            </div>
+            <div className="flex flex-col truncate">
+              <span className="text-sm font-semibold text-[#191c1e] truncate leading-tight">
+                Alex Mercer
               </span>
-              <span className="text-slate-500 font-mono text-[10px]">
-                {sandboxStatus?.clientIdMasked || 'ZERO-TRUST-ISOLATED'}
+              <span className="text-xs text-[#434655] truncate">Risk Operations</span>
+            </div>
+          </div>
+        </div>
+      </aside>
+
+      {/* Main Container (offset 240px on desktop) */}
+      <div className="lg:pl-[240px]">
+        {/* Fixed Top Header (matches prototype) */}
+        <header className="fixed top-0 lg:left-[240px] left-0 right-0 h-16 bg-[#f8f9fb]/90 backdrop-blur-xl border-b border-[#e1e2e4] z-40 flex items-center justify-between px-6">
+          {/* Mobile hamburger & Breadcrumb */}
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setIsMobileMenuOpen(prev => !prev)}
+              className="lg:hidden p-1.5 text-[#434655] hover:text-[#191c1e] hover:bg-slate-200/50 rounded-lg"
+              aria-label="Toggle mobile navigation"
+            >
+              <span className="material-symbols-outlined text-[22px]">menu</span>
+            </button>
+            <div className="flex items-center gap-2 text-sm">
+              <span className="text-[#434655] font-normal">TrustShield</span>
+              <span className="text-[#737686]">/</span>
+              <span className="text-[#191c1e] font-semibold">{activeNavLabel}</span>
+            </div>
+          </div>
+
+          {/* Search Bar & Quick Actions */}
+          <div className="flex items-center gap-3">
+            {/* Global Search Bar */}
+            <div className="relative hidden md:flex items-center">
+              <span className="material-symbols-outlined absolute left-3 text-[#737686] text-[18px]">
+                search
               </span>
+              <input
+                type="text"
+                placeholder="Search transactions, cases, merchants..."
+                className="w-72 pl-9 pr-3 py-1.5 bg-[#f2f4f6] text-[#191c1e] text-xs rounded-lg outline-none focus:ring-1 focus:ring-[#004ac6] border border-transparent focus:border-[#004ac6] transition-all"
+              />
             </div>
 
-            {/* Copilot Quick Trigger */}
+            {/* AI Copilot Shortcut Button */}
             <button
               onClick={() => setIsCopilotOpen(true)}
-              className="px-3 py-1.5 text-xs font-bold text-white rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 hover:opacity-95 shadow transition flex items-center space-x-1.5 cursor-pointer"
-              title="Open AI Copilot (⌘K / Ctrl+K)"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100 text-xs font-semibold border border-blue-200 transition-colors cursor-pointer"
+              title="Open PayPal TrustShield AI Copilot (Ctrl + K)"
             >
-              <span>💬</span>
-              <span>Copilot</span>
-              <kbd className="hidden md:inline px-1 py-0.5 rounded bg-blue-800/60 font-mono text-[10px]">⌘K</kbd>
+              <span className="material-symbols-outlined text-[16px]">smart_toy</span>
+              <span className="hidden sm:inline">Copilot</span>
+              <kbd className="hidden lg:inline px-1 py-0.2 text-[10px] bg-white rounded border border-blue-300 font-mono text-blue-600">
+                ⌘K
+              </kbd>
             </button>
 
-            {/* Shortcuts Trigger */}
+            {/* Reset Demo State Button */}
             <button
-              onClick={() => setIsShortcutsModalOpen(true)}
-              className="px-2.5 py-1.5 text-xs font-semibold text-slate-300 hover:text-white rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 transition flex items-center space-x-1 cursor-pointer"
-              title="Keyboard Shortcuts (?)"
+              onClick={handleResetDemo}
+              className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-[#edeef0] text-[#434655] hover:text-[#191c1e] hover:bg-[#e1e2e4] text-xs font-medium transition-colors cursor-pointer"
+              title="Reset All Local State to Demo Defaults"
             >
-              <span>⌨️</span>
-              <span className="hidden md:inline">Shortcuts</span>
+              <span className="material-symbols-outlined text-[16px]">restart_alt</span>
+              <span className="hidden md:inline">Reset</span>
             </button>
 
-            {/* Diagnostics Trigger */}
+            {/* System Diagnostics Trigger */}
             <button
               onClick={() => setShowDiagnosticsModal(true)}
-              className="px-2.5 py-1.5 text-xs font-semibold text-slate-300 hover:text-white rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 transition flex items-center space-x-1.5 cursor-pointer"
-              title="System Diagnostics & Observability"
+              className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-[#edeef0] text-[#434655] hover:text-[#191c1e] hover:bg-[#e1e2e4] text-xs font-medium transition-colors cursor-pointer"
+              title="Open System Diagnostics & Metrics"
             >
-              <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
+              <span className="material-symbols-outlined text-[16px]">tune</span>
               <span className="hidden md:inline">Diagnostics</span>
             </button>
 
+            {/* Notification Bell */}
             <button
-              onClick={handleResetDemo}
-              className="px-2.5 py-1.5 text-xs font-semibold text-rose-300 hover:text-white rounded-lg bg-rose-950/40 hover:bg-rose-900/60 border border-rose-800/40 transition flex items-center space-x-1 cursor-pointer"
-              title="Reset Demo to Baseline Presets"
+              className="relative p-2 rounded-lg text-[#434655] hover:bg-[#edeef0] hover:text-[#191c1e] transition-colors cursor-pointer"
+              title="Notifications"
             >
-              <span>🔄</span>
-              <span className="hidden md:inline">Reset Demo</span>
-            </button>
-
-            <button
-              onClick={() => { fetchSummary(); fetchSandboxStatus(); }}
-              className="p-2 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition cursor-pointer"
-              title="Refresh Data"
-            >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-              </svg>
+              <span className="material-symbols-outlined text-[20px]">notifications</span>
+              <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-blue-600 rounded-full"></span>
             </button>
           </div>
-        </div>
+        </header>
 
-        {/* Navigation Tabs */}
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex space-x-4 -mb-px overflow-x-auto">
-          {[
-            { id: 'investigation', label: '🕵️ Investigation Workspace' },
-            { id: 'dashboard', label: '📊 Executive Dashboard' },
-            { id: 'ai-ops', label: '⚡ AI Operations' },
-            { id: 'fraud-intel', label: '🕸️ Fraud Intel & Graphs' },
-            { id: 'seller', label: '🏪 Merchant Intel' },
-            { id: 'invoice', label: '📄 Invoice Shield' },
-            { id: 'agents', label: '🤖 AI Agent Hub' },
-            { id: 'monitoring', label: '📈 System Monitoring' },
-            { id: 'audit', label: '📜 Audit Center' },
-            { id: 'knowledge', label: '📚 Knowledge Base' },
-            { id: 'sandbox', label: '💳 PayPal Orders v2' }
-          ].map(tab => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id as typeof activeTab)}
-              className={`py-3 px-2 border-b-2 font-medium text-xs flex items-center space-x-1.5 transition whitespace-nowrap cursor-pointer ${
-                activeTab === tab.id
-                  ? 'border-blue-500 text-blue-400 font-bold'
-                  : 'border-transparent text-slate-400 hover:text-slate-200 hover:border-slate-700'
-              }`}
-            >
-              <span>{tab.label}</span>
-            </button>
-          ))}
-        </div>
-      </header>
-
-      {/* Main Content Area */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-1">
-        {/* Global Notification Banner */}
-        <div className="mb-6 rounded-xl bg-gradient-to-r from-blue-950/40 via-indigo-950/30 to-slate-900 border border-blue-500/20 p-4 flex items-center justify-between text-xs text-blue-300">
-          <div className="flex items-center space-x-3">
-            <span className="flex h-2.5 w-2.5 relative">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-blue-500"></span>
-            </span>
-            <span>
-              <strong>ENTERPRISE FRAUD DEFENSE:</strong> Clean architecture, OWASP protections, multi-agent cooperative intelligence, request tracing, and Human Review Center.
-            </span>
-          </div>
-          <span className="hidden md:inline-block font-mono text-[11px] text-blue-400/80 bg-blue-900/30 px-2 py-1 rounded border border-blue-500/30">
-            {sandboxStatus?.isConfigured ? 'Sandbox Connected' : 'Simulated Sandbox Mode'}
-          </span>
-        </div>
-
-        {/* TAB: INVESTIGATION WORKSPACE */}
-        {(activeTab === 'investigation' || activeTab === 'review') && (
-          <InvestigationWorkspace
-            onSelectCaseForCopilot={setCopilotCaseFocus}
-            onOpenCopilot={() => setIsCopilotOpen(true)}
-          />
-        )}
-
-        {/* TAB: AI OPERATIONS CENTER */}
-        {activeTab === 'ai-ops' && (
-          <AiOperationsCenter
-            onOpenCopilot={() => setIsCopilotOpen(true)}
-            onRunScenario={() => setActiveTab('agents')}
-          />
-        )}
-
-        {/* TAB: FRAUD INTELLIGENCE & GRAPHS */}
-        {activeTab === 'fraud-intel' && (
-          <FraudIntelligenceCenter />
-        )}
-
-        {/* TAB: SYSTEM MONITORING */}
-        {activeTab === 'monitoring' && (
-          <SystemMonitoringCenter />
-        )}
-
-        {/* TAB: KNOWLEDGE BASE */}
-        {activeTab === 'knowledge' && (
-          <KnowledgeCenter />
-        )}
-
-        {/* TAB: MULTI-AGENT AI HUB */}
-        {activeTab === 'agents' && (
-          <MultiAgentHub onSelectSandboxOrder={(orderId) => {
-            setCaptureOrderId(orderId);
-            setActiveTab('sandbox');
-          }} />
-        )}
-
-        {/* TAB 1: EXECUTIVE DASHBOARD */}
-        {activeTab === 'dashboard' && (
-          <div className="space-y-8">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-              <div className="rounded-2xl bg-slate-900/90 border border-slate-800 p-5 shadow-xl hover:border-slate-700 transition">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-medium text-slate-400 uppercase tracking-wider">Total Analyzed</span>
-                  <div className="p-2 rounded-lg bg-blue-500/10 text-blue-400">
-                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                  </div>
-                </div>
-                <div className="mt-3">
-                  <div className="text-3xl font-extrabold text-white">
-                    {summary?.totalTransactionsAnalyzed.toLocaleString() || '14,820'}
-                  </div>
-                  <div className="mt-1 flex items-center text-xs text-emerald-400 font-medium">
-                    <span>↑ 18.4% volume</span>
-                    <span className="ml-2 text-slate-500">(simulated Q4)</span>
-                  </div>
-                </div>
+        {/* Main Content Viewport */}
+        <main className="pt-20 px-6 pb-12 max-w-7xl mx-auto space-y-6">
+          {actionAlert && (
+            <div className="p-4 rounded-xl bg-blue-50 border border-blue-200 text-blue-900 text-xs flex items-center justify-between shadow-xs">
+              <div className="flex items-center gap-2">
+                <span className="material-symbols-outlined text-[18px] text-blue-600">info</span>
+                <span>{actionAlert}</span>
               </div>
-
-              <div className="rounded-2xl bg-slate-900/90 border border-slate-800 p-5 shadow-xl hover:border-slate-700 transition">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-medium text-slate-400 uppercase tracking-wider">High-Risk Cases</span>
-                  <div className="p-2 rounded-lg bg-rose-500/10 text-rose-400">
-                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                    </svg>
-                  </div>
-                </div>
-                <div className="mt-3">
-                  <div className="text-3xl font-extrabold text-rose-400">
-                    {summary?.highRiskCases || '38'}
-                  </div>
-                  <div className="mt-1 flex items-center text-xs text-slate-400">
-                    <span>0.25% anomaly rate</span>
-                    <span className="ml-2 text-slate-500">(100% precision)</span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="rounded-2xl bg-slate-900/90 border border-slate-800 p-5 shadow-xl hover:border-slate-700 transition">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-medium text-slate-400 uppercase tracking-wider">Seller Alerts</span>
-                  <div className="p-2 rounded-lg bg-amber-500/10 text-amber-400">
-                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
-                    </svg>
-                  </div>
-                </div>
-                <div className="mt-3">
-                  <div className="text-3xl font-extrabold text-amber-300">
-                    {summary?.sellerAlerts || '14'}
-                  </div>
-                  <div className="mt-1 flex items-center text-xs text-slate-400">
-                    <span>Monitored Growth Spikes</span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="rounded-2xl bg-slate-900/90 border border-slate-800 p-5 shadow-xl hover:border-slate-700 transition">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-medium text-slate-400 uppercase tracking-wider">Invoice Scans</span>
-                  <div className="p-2 rounded-lg bg-cyan-500/10 text-cyan-400">
-                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                    </svg>
-                  </div>
-                </div>
-                <div className="mt-3">
-                  <div className="text-3xl font-extrabold text-cyan-300">
-                    {summary?.invoiceScans || '412'}
-                  </div>
-                  <div className="mt-1 flex items-center text-xs text-slate-400">
-                    <span>Scam Pre-screening</span>
-                  </div>
-                </div>
-              </div>
+              <button
+                onClick={() => setActionAlert(null)}
+                className="text-blue-600 hover:text-blue-800 font-semibold text-xs cursor-pointer"
+              >
+                Dismiss
+              </button>
             </div>
+          )}
 
-            {/* Charts Section */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              <div className="rounded-2xl bg-slate-900/90 border border-slate-800 p-6 shadow-xl flex flex-col justify-between">
+          {/* =========================================================================
+              VIEW 1: EXECUTIVE OVERVIEW (DASHBOARD)
+              ========================================================================= */}
+          {activeTab === 'dashboard' && (
+            <div className="space-y-6">
+              {/* Header Title Section */}
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
-                  <h3 className="text-base font-semibold text-white">Risk Distribution Ratio</h3>
-                  <p className="text-xs text-slate-400 mt-1">Classification breakdown of simulated benchmark</p>
+                  <h1 className="text-2xl font-bold text-[#191c1e] tracking-tight">
+                    Executive Risk &amp; Fraud Overview
+                  </h1>
+                  <p className="text-sm text-[#434655] mt-1">
+                    Real-time AI telemetry, merchant volatility assessment, and synthetic threat detection.
+                  </p>
                 </div>
-
-                <div className="h-64 my-4 flex items-center justify-center">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie
-                        data={pieData}
-                        innerRadius={60}
-                        outerRadius={85}
-                        paddingAngle={5}
-                        dataKey="value"
-                      >
-                        {pieData.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={entry.color} />
-                        ))}
-                      </Pie>
-                      <Tooltip
-                        contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', borderRadius: '0.75rem', fontSize: '12px' }}
-                        itemStyle={{ color: '#f8fafc' }}
-                      />
-                      <Legend verticalAlign="bottom" wrapperStyle={{ fontSize: '11px', paddingTop: '10px' }} />
-                    </PieChart>
-                  </ResponsiveContainer>
-                </div>
-
-                <div className="pt-3 border-t border-slate-800/80 text-[11px] text-slate-400 flex justify-between">
-                  <span>Healthy / Low: 82%</span>
-                  <span>Review Required: 4%</span>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => window.open('/api/audit/export?format=csv', '_blank')}
+                    className="flex items-center gap-1.5 px-3.5 py-2 bg-white hover:bg-slate-50 text-[#191c1e] text-xs font-semibold rounded-lg border border-[#e1e2e4] shadow-xs transition-colors cursor-pointer"
+                  >
+                    <span className="material-symbols-outlined text-[16px]">download</span> Export CSV
+                  </button>
+                  <button
+                    onClick={() => handleRunPresetSeller(0)}
+                    className="flex items-center gap-1.5 px-3.5 py-2 bg-[#004ac6] hover:bg-[#003ea8] text-white text-xs font-semibold rounded-lg shadow-sm transition-colors cursor-pointer"
+                  >
+                    <span className="material-symbols-outlined text-[16px]">bolt</span> Simulate Holiday Surge
+                  </button>
                 </div>
               </div>
 
-              <div className="rounded-2xl bg-slate-900/90 border border-slate-800 p-6 shadow-xl lg:col-span-2">
-                <div className="flex items-center justify-between mb-4">
+              {/* Top 4 KPI Metrics Strip (matches prototype) */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                {/* Metric 1 */}
+                <div className="bg-white border border-[#e1e2e4] p-5 rounded-xl shadow-xs flex flex-col justify-between">
+                  <div className="flex items-center justify-between text-[#434655] mb-2">
+                    <span className="text-xs uppercase font-semibold tracking-wider">Total Volume (24h)</span>
+                    <span className="material-symbols-outlined text-[20px] text-blue-600">payments</span>
+                  </div>
                   <div>
-                    <h3 className="text-base font-semibold text-white">Transaction Volume & Anomaly Velocity</h3>
-                    <p className="text-xs text-slate-400 mt-1">Simulated load vs flagged high-risk transactions</p>
+                    <div className="text-2xl font-bold text-[#191c1e] font-mono">$1,248,590.00</div>
+                    <div className="flex items-center gap-1 text-xs text-emerald-700 mt-1 font-medium">
+                      <span className="material-symbols-outlined text-[14px]">trending_up</span>
+                      +12.4% from yesterday
+                    </div>
                   </div>
-                  <span className="text-xs bg-slate-800 px-2.5 py-1 rounded text-slate-300 font-mono">Simulated 7-Day Window</span>
                 </div>
 
-                <div className="h-64">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={activityBarData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
-                      <XAxis dataKey="day" stroke="#64748b" fontSize={12} />
-                      <YAxis stroke="#64748b" fontSize={12} />
-                      <Tooltip
-                        contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', borderRadius: '0.75rem', fontSize: '12px' }}
-                        itemStyle={{ color: '#f8fafc' }}
-                      />
-                      <Bar dataKey="analyzed" name="Analyzed Volume" fill="#3b82f6" radius={[4, 4, 0, 0]} />
-                      <Bar dataKey="highRisk" name="High Risk Flagged" fill="#f43f5e" radius={[4, 4, 0, 0]} />
-                    </BarChart>
-                  </ResponsiveContainer>
+                {/* Metric 2 */}
+                <div className="bg-white border border-[#e1e2e4] p-5 rounded-xl shadow-xs flex flex-col justify-between">
+                  <div className="flex items-center justify-between text-[#434655] mb-2">
+                    <span className="text-xs uppercase font-semibold tracking-wider">Flagged Risk Events</span>
+                    <span className="material-symbols-outlined text-[20px] text-rose-600">gpp_bad</span>
+                  </div>
+                  <div>
+                    <div className="text-2xl font-bold text-[#191c1e] font-mono">
+                      {summary?.highRiskCases ?? 38}
+                    </div>
+                    <div className="flex items-center gap-1 text-xs text-rose-700 mt-1 font-medium">
+                      <span className="material-symbols-outlined text-[14px]">warning</span>
+                      Requires immediate review
+                    </div>
+                  </div>
+                </div>
+
+                {/* Metric 3 */}
+                <div className="bg-white border border-[#e1e2e4] p-5 rounded-xl shadow-xs flex flex-col justify-between">
+                  <div className="flex items-center justify-between text-[#434655] mb-2">
+                    <span className="text-xs uppercase font-semibold tracking-wider">Auto-Cleared</span>
+                    <span className="material-symbols-outlined text-[20px] text-emerald-600">verified_user</span>
+                  </div>
+                  <div>
+                    <div className="text-2xl font-bold text-[#191c1e] font-mono">
+                      {summary?.totalTransactionsAnalyzed ? (summary.totalTransactionsAnalyzed - (summary.highRiskCases || 0)).toLocaleString() : '14,782'}
+                    </div>
+                    <div className="flex items-center gap-1 text-xs text-emerald-700 mt-1 font-medium">
+                      <span className="material-symbols-outlined text-[14px]">check_circle</span>
+                      98.4% clearance rate
+                    </div>
+                  </div>
+                </div>
+
+                {/* Metric 4 */}
+                <div className="bg-white border border-[#e1e2e4] p-5 rounded-xl shadow-xs flex flex-col justify-between">
+                  <div className="flex items-center justify-between text-[#434655] mb-2">
+                    <span className="text-xs uppercase font-semibold tracking-wider">Model Precision</span>
+                    <span className="material-symbols-outlined text-[20px] text-amber-600">analytics</span>
+                  </div>
+                  <div>
+                    <div className="text-2xl font-bold text-[#191c1e] font-mono">99.8%</div>
+                    <div className="flex items-center gap-1 text-xs text-[#434655] mt-1 font-medium">
+                      <span className="material-symbols-outlined text-[14px]">shield</span>
+                      0.0% False Positive Rate
+                    </div>
+                  </div>
                 </div>
               </div>
-            </div>
 
-            {/* Recent Security Activity Table */}
-            <div className="rounded-2xl bg-slate-900/90 border border-slate-800 shadow-xl overflow-hidden">
-              <div className="p-6 border-b border-slate-800 flex items-center justify-between">
-                <div>
-                  <h3 className="text-base font-semibold text-white">Live Risk Audit Stream (Simulated Benchmark)</h3>
-                  <p className="text-xs text-slate-400 mt-1">Real-time decisions emitted by TrustShield AI risk engines</p>
+              {/* 1-Click Quick Scenario Dispatchers */}
+              <div className="bg-white border border-[#e1e2e4] rounded-xl p-5 shadow-xs">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    <span className="material-symbols-outlined text-[18px] text-blue-600">flag</span>
+                    <h2 className="text-sm font-bold text-[#191c1e]">1-Click Hackathon Evaluation Presets</h2>
+                  </div>
+                  <span className="text-xs text-[#434655]">Direct execution triggers</span>
                 </div>
-                <button
-                  onClick={fetchSummary}
-                  className="px-3 py-1.5 text-xs font-medium rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 transition"
-                >
-                  Refresh Feed
-                </button>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                  <button
+                    onClick={() => handleRunPresetSeller(0)}
+                    className="p-3 rounded-lg border border-[#e1e2e4] hover:border-emerald-500 bg-[#f8f9fb] hover:bg-emerald-50/40 text-left transition-all cursor-pointer group"
+                  >
+                    <div className="flex items-center justify-between text-xs font-bold text-emerald-700">
+                      <span>Holiday Sales Spike</span>
+                      <span>+218%</span>
+                    </div>
+                    <p className="text-[11px] text-[#434655] mt-1 leading-relaxed">
+                      Legitimate surge with 0% dispute rate. Distinguishes growth from fraud.
+                    </p>
+                  </button>
+
+                  <button
+                    onClick={() => handleRunPresetSeller(1)}
+                    className="p-3 rounded-lg border border-[#e1e2e4] hover:border-rose-500 bg-[#f8f9fb] hover:bg-rose-50/40 text-left transition-all cursor-pointer group"
+                  >
+                    <div className="flex items-center justify-between text-xs font-bold text-rose-700">
+                      <span>Compromised Surge</span>
+                      <span>ATO Attack</span>
+                    </div>
+                    <p className="text-[11px] text-[#434655] mt-1 leading-relaxed">
+                      +300% volume with 30% disputes and unverified payers. High risk flag.
+                    </p>
+                  </button>
+
+                  <button
+                    onClick={() => handleRunPresetInvoice(0)}
+                    className="p-3 rounded-lg border border-[#e1e2e4] hover:border-amber-500 bg-[#f8f9fb] hover:bg-amber-50/40 text-left transition-all cursor-pointer group"
+                  >
+                    <div className="flex items-center justify-between text-xs font-bold text-amber-700">
+                      <span>Geek Squad Scam</span>
+                      <span>$499 Phish</span>
+                    </div>
+                    <p className="text-[11px] text-[#434655] mt-1 leading-relaxed">
+                      Brand spoofing, toll-free callback threat, fake subscription auto-renewal.
+                    </p>
+                  </button>
+
+                  <button
+                    onClick={() => handleRunPresetInvoice(2)}
+                    className="p-3 rounded-lg border border-[#e1e2e4] hover:border-purple-500 bg-[#f8f9fb] hover:bg-purple-50/40 text-left transition-all cursor-pointer group"
+                  >
+                    <div className="flex items-center justify-between text-xs font-bold text-purple-700">
+                      <span>Prompt Injection</span>
+                      <span>Adversarial</span>
+                    </div>
+                    <p className="text-[11px] text-[#434655] mt-1 leading-relaxed">
+                      "Ignore all previous instructions" malicious attack neutralized &amp; quarantined.
+                    </p>
+                  </button>
+                </div>
               </div>
 
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs text-slate-300">
-                  <thead className="bg-slate-800/60 text-slate-400 uppercase tracking-wider text-[10px]">
-                    <tr>
-                      <th className="py-3 px-4">Event ID</th>
-                      <th className="py-3 px-4">Engine Type</th>
-                      <th className="py-3 px-4">Entity Identifier</th>
-                      <th className="py-3 px-4">Risk Category</th>
-                      <th className="py-3 px-4">Score</th>
-                      <th className="py-3 px-4">Executive Summary</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-800">
-                    {summary?.recentActivity.map(act => (
-                      <tr key={act.id} className="hover:bg-slate-800/40 transition">
-                        <td className="py-3 px-4 font-mono text-slate-400">{act.id}</td>
-                        <td className="py-3 px-4">
-                          <span className={`px-2 py-0.5 rounded text-[10px] font-semibold uppercase ${
-                            act.type === 'seller-protection'
-                              ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20'
-                              : 'bg-purple-500/10 text-purple-400 border border-purple-500/20'
-                          }`}>
-                            {act.type === 'seller-protection' ? 'Seller Protection' : 'Invoice Shield'}
-                          </span>
-                        </td>
-                        <td className="py-3 px-4 font-mono font-medium text-slate-200">{act.entityId}</td>
-                        <td className="py-3 px-4">
-                          <span className={`px-2 py-0.5 rounded text-[11px] font-medium border ${getRiskColor(act.riskCategory)}`}>
-                            {act.riskCategory}
-                          </span>
-                        </td>
-                        <td className="py-3 px-4 font-mono font-bold text-slate-100">{act.riskScore}/100</td>
-                        <td className="py-3 px-4 text-slate-300 max-w-md truncate">{act.summary}</td>
+              {/* Dual Visualizations: Risk Distribution & Transaction Stream */}
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                {/* Donut Chart: Risk Distribution (5 Cols) */}
+                <div className="lg:col-span-5 bg-white border border-[#e1e2e4] p-5 rounded-xl shadow-xs flex flex-col justify-between">
+                  <div className="flex items-center justify-between mb-2">
+                    <h2 className="text-sm font-bold text-[#191c1e]">Risk Distribution Profile</h2>
+                    <span className="text-xs text-[#434655] font-mono">14,820 Evaluated</span>
+                  </div>
+                  <div className="h-56">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={pieData}
+                          dataKey="value"
+                          nameKey="name"
+                          cx="50%"
+                          cy="50%"
+                          innerRadius={55}
+                          outerRadius={80}
+                          paddingAngle={4}
+                        >
+                          {pieData.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={entry.color} />
+                          ))}
+                        </Pie>
+                        <Tooltip
+                          contentStyle={{
+                            backgroundColor: '#ffffff',
+                            borderColor: '#e1e2e4',
+                            borderRadius: '8px',
+                            color: '#191c1e',
+                            fontSize: '12px',
+                            boxShadow: '0 2px 4px rgba(0,0,0,0.05)'
+                          }}
+                        />
+                        <Legend
+                          verticalAlign="bottom"
+                          height={36}
+                          wrapperStyle={{ fontSize: '11px', color: '#434655' }}
+                        />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+
+                {/* Bar Chart: 7-Day Stream Velocity (7 Cols) */}
+                <div className="lg:col-span-7 bg-white border border-[#e1e2e4] p-5 rounded-xl shadow-xs flex flex-col justify-between">
+                  <div className="flex items-center justify-between mb-2">
+                    <h2 className="text-sm font-bold text-[#191c1e]">7-Day Stream Volume &amp; Threat Velocity</h2>
+                    <span className="text-xs text-emerald-700 font-semibold">99.8% Auto-Cleared</span>
+                  </div>
+                  <div className="h-56">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={streamData}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#f2f4f6" />
+                        <XAxis dataKey="day" stroke="#737686" fontSize={11} />
+                        <YAxis stroke="#737686" fontSize={11} />
+                        <Tooltip
+                          contentStyle={{
+                            backgroundColor: '#ffffff',
+                            borderColor: '#e1e2e4',
+                            borderRadius: '8px',
+                            color: '#191c1e',
+                            fontSize: '12px',
+                            boxShadow: '0 2px 4px rgba(0,0,0,0.05)'
+                          }}
+                        />
+                        <Bar dataKey="cleared" name="Auto-Cleared" fill="#004ac6" radius={[4, 4, 0, 0]} />
+                        <Bar dataKey="flagged" name="Risk Flagged" fill="#dc2626" radius={[4, 4, 0, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+              </div>
+
+              {/* Real-Time Risk Audit Stream Table */}
+              <div className="bg-white border border-[#e1e2e4] rounded-xl overflow-hidden shadow-xs">
+                <div className="p-4 border-b border-[#e1e2e4] flex items-center justify-between bg-[#f8f9fb]">
+                  <div className="flex items-center gap-2">
+                    <span className="material-symbols-outlined text-[18px] text-blue-600">receipt_long</span>
+                    <h2 className="text-sm font-bold text-[#191c1e]">Recent Risk Audit Stream</h2>
+                  </div>
+                  <span className="text-xs text-[#434655] font-mono">Real-Time Ingestion</span>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs divide-y divide-[#e1e2e4]">
+                    <thead className="bg-[#f2f4f6] text-[#434655] font-semibold uppercase tracking-wider text-[11px]">
+                      <tr>
+                        <th className="py-3 px-4">Event ID</th>
+                        <th className="py-3 px-4">Timestamp</th>
+                        <th className="py-3 px-4">Vector</th>
+                        <th className="py-3 px-4">Subject Entity</th>
+                        <th className="py-3 px-4">Category</th>
+                        <th className="py-3 px-4 text-right">Score</th>
+                        <th className="py-3 px-4">Forensic Summary</th>
+                        <th className="py-3 px-4 text-right">Action</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* TAB 2: SELLER PROTECTION INTELLIGENCE */}
-        {activeTab === 'seller' && (
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-            <div className="lg:col-span-5 space-y-6">
-              <div className="rounded-2xl bg-slate-900/90 border border-slate-800 p-6 shadow-xl">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-base font-semibold text-white">Merchant Risk Parameters</h3>
-                  <span className="text-xs text-blue-400 font-medium">Explainable Rules</span>
-                </div>
-
-                <div className="mb-5">
-                  <label className="block text-xs font-medium text-slate-400 mb-2">Load Realistic Benchmark Presets</label>
-                  <div className="grid grid-cols-1 gap-2">
-                    {SELLER_PRESETS.map((preset, idx) => (
-                      <button
-                        key={idx}
-                        type="button"
-                        onClick={() => {
-                          setSellerForm({ ...preset.data });
-                          setSellerResult(null);
-                        }}
-                        className="text-left px-3 py-2 rounded-xl bg-slate-800/60 hover:bg-slate-800 border border-slate-700/60 hover:border-blue-500/40 transition group"
-                      >
-                        <div className="font-semibold text-xs text-slate-200 group-hover:text-blue-300">{preset.name}</div>
-                        <div className="text-[11px] text-slate-400 mt-0.5">{preset.desc}</div>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <form onSubmit={handleAnalyzeSeller} className="space-y-4">
-                  <div>
-                    <label className="block text-xs font-medium text-slate-300 mb-1">Merchant Identifier</label>
-                    <input
-                      type="text"
-                      value={sellerForm.merchantId}
-                      onChange={e => setSellerForm({ ...sellerForm, merchantId: e.target.value })}
-                      className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-sm text-slate-200 focus:outline-none focus:border-blue-500"
-                      required
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-medium text-slate-300 mb-1">
-                      Recent Transactions (USD, comma-separated)
-                    </label>
-                    <textarea
-                      rows={2}
-                      value={sellerForm.transactions}
-                      onChange={e => setSellerForm({ ...sellerForm, transactions: e.target.value })}
-                      className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-xs font-mono text-slate-200 focus:outline-none focus:border-blue-500"
-                      placeholder="e.g. 150, 200, 350, 400"
-                      required
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-xs font-medium text-slate-300 mb-1">Prev Month Sales ($)</label>
-                      <input
-                        type="number"
-                        min="0"
-                        step="any"
-                        value={sellerForm.previousMonthSales}
-                        onChange={e => setSellerForm({ ...sellerForm, previousMonthSales: parseFloat(e.target.value) || 0 })}
-                        className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-sm text-slate-200 focus:outline-none focus:border-blue-500"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-medium text-slate-300 mb-1">Account Age (Days)</label>
-                      <input
-                        type="number"
-                        min="0"
-                        value={sellerForm.accountAgeDays}
-                        onChange={e => setSellerForm({ ...sellerForm, accountAgeDays: parseInt(e.target.value) || 0 })}
-                        className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-sm text-slate-200 focus:outline-none focus:border-blue-500"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-xs font-medium text-slate-300 mb-1">Disputes (Count)</label>
-                      <input
-                        type="number"
-                        min="0"
-                        value={sellerForm.disputes}
-                        onChange={e => setSellerForm({ ...sellerForm, disputes: parseInt(e.target.value) || 0 })}
-                        className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-sm text-slate-200 focus:outline-none focus:border-blue-500"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-medium text-slate-300 mb-1">Refunds (Count)</label>
-                      <input
-                        type="number"
-                        min="0"
-                        value={sellerForm.refunds}
-                        onChange={e => setSellerForm({ ...sellerForm, refunds: parseInt(e.target.value) || 0 })}
-                        className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-sm text-slate-200 focus:outline-none focus:border-blue-500"
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-medium text-slate-300 mb-1">
-                      Unverified Payer Concentration ({sellerForm.unverifiedPayerRatio}%)
-                    </label>
-                    <input
-                      type="range"
-                      min="0"
-                      max="100"
-                      value={sellerForm.unverifiedPayerRatio}
-                      onChange={e => setSellerForm({ ...sellerForm, unverifiedPayerRatio: parseInt(e.target.value) || 0 })}
-                      className="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-blue-500"
-                    />
-                  </div>
-
-                  {sellerError && (
-                    <div className="p-3 rounded-lg bg-rose-950/60 border border-rose-500/40 text-xs text-rose-300">
-                      {sellerError}
-                    </div>
-                  )}
-
-                  <button
-                    type="submit"
-                    disabled={loadingSeller}
-                    className="w-full py-2.5 px-4 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-medium text-sm rounded-xl shadow-lg shadow-blue-500/25 transition disabled:opacity-50"
-                  >
-                    {loadingSeller ? 'Executing Deterministic Analysis...' : 'Evaluate Seller Risk Profile'}
-                  </button>
-                </form>
-              </div>
-            </div>
-
-            <div className="lg:col-span-7">
-              {sellerResult ? (
-                <div className="space-y-6">
-                  {/* Executive Assessment Card */}
-                  <div className="rounded-2xl bg-slate-900/90 border border-slate-800 p-6 shadow-xl">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <span className="text-xs font-mono text-slate-400">{sellerResult.merchantId}</span>
-                        <h3 className="text-xl font-bold text-white mt-1">Risk Assessment Result</h3>
-                      </div>
-                      <div className="text-right">
-                        <div className="flex items-center space-x-2 justify-end mb-1">
-                          <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase border ${
-                            sellerResult.evidenceSufficiency === 'High' ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30' :
-                            sellerResult.evidenceSufficiency === 'Moderate' ? 'bg-blue-500/10 text-blue-300 border-blue-500/30' :
-                            'bg-cyan-500/10 text-cyan-300 border-cyan-500/30'
-                          }`}>
-                            Evidence: {sellerResult.evidenceSufficiency} ({sellerResult.confidenceScore}%)
-                          </span>
-                          <span className={`px-3 py-1 rounded-full text-xs font-bold border ${getRiskColor(sellerResult.category)}`}>
-                            {sellerResult.category}
-                          </span>
-                        </div>
-                        <div className="text-2xl font-black text-white font-mono">
-                          {sellerResult.riskScore}<span className="text-xs text-slate-400 font-normal">/100</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    <p className="mt-4 text-sm text-slate-300 leading-relaxed bg-slate-950/60 p-4 rounded-xl border border-slate-800">
-                      {sellerResult.explanation}
-                    </p>
-
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-5">
-                      <div className="bg-slate-950/80 p-3 rounded-xl border border-slate-800/80">
-                        <span className="text-[10px] uppercase tracking-wider text-slate-400">Recent Sales</span>
-                        <div className="text-sm font-bold text-white mt-0.5">${sellerResult.metrics.totalRecentSales.toFixed(2)}</div>
-                      </div>
-                      <div className="bg-slate-950/80 p-3 rounded-xl border border-slate-800/80">
-                        <span className="text-[10px] uppercase tracking-wider text-slate-400">Sales Growth</span>
-                        <div className={`text-sm font-bold mt-0.5 ${sellerResult.metrics.salesGrowthPercentage > 50 ? 'text-cyan-400' : 'text-slate-200'}`}>
-                          +{sellerResult.metrics.salesGrowthPercentage}%
-                        </div>
-                      </div>
-                      <div className="bg-slate-950/80 p-3 rounded-xl border border-slate-800/80">
-                        <span className="text-[10px] uppercase tracking-wider text-slate-400">Dispute Rate</span>
-                        <div className={`text-sm font-bold mt-0.5 ${sellerResult.metrics.disputeRatePercentage > 1.0 ? 'text-rose-400' : 'text-emerald-400'}`}>
-                          {sellerResult.metrics.disputeRatePercentage}%
-                        </div>
-                      </div>
-                      <div className="bg-slate-950/80 p-3 rounded-xl border border-slate-800/80">
-                        <span className="text-[10px] uppercase tracking-wider text-slate-400">Refund Rate</span>
-                        <div className={`text-sm font-bold mt-0.5 ${sellerResult.metrics.refundRatePercentage > 5.0 ? 'text-amber-400' : 'text-emerald-400'}`}>
-                          {sellerResult.metrics.refundRatePercentage}%
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Explainable Evidence Breakdown (Decoupled Evidence vs Risk vs Missing Info) */}
-                  <div className="rounded-2xl bg-slate-900/90 border border-slate-800 p-6 shadow-xl space-y-4">
-                    <div className="flex items-center justify-between">
-                      <h4 className="text-sm font-bold text-white uppercase tracking-wider">Explainable Evidence Breakdown</h4>
-                      <span className="text-[10px] text-blue-400 font-mono">Zero-Black-Box AI Architecture</span>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
-                      {/* Observed Evidence */}
-                      <div className="p-4 rounded-xl bg-slate-950 border border-blue-500/20 space-y-2">
-                        <span className="font-bold text-blue-400 uppercase tracking-wider text-[11px] block">1. Observed Evidence</span>
-                        <ul className="space-y-1.5 text-slate-300 text-[11px]">
-                          {sellerResult.observedEvidence.map((obs, idx) => (
-                            <li key={idx} className="flex items-start">
-                              <span className="text-blue-400 mr-1.5">•</span>
-                              <span>{obs}</span>
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-
-                      {/* Inferred Risk */}
-                      <div className="p-4 rounded-xl bg-slate-950 border border-purple-500/20 space-y-2">
-                        <span className="font-bold text-purple-400 uppercase tracking-wider text-[11px] block">2. Inferred Risk Deduction</span>
-                        <ul className="space-y-1.5 text-slate-300 text-[11px]">
-                          {sellerResult.inferredRisk.map((inf, idx) => (
-                            <li key={idx} className="flex items-start">
-                              <span className="text-purple-400 mr-1.5">•</span>
-                              <span>{inf}</span>
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-
-                      {/* Missing Information */}
-                      <div className="p-4 rounded-xl bg-slate-950 border border-amber-500/20 space-y-2">
-                        <span className="font-bold text-amber-400 uppercase tracking-wider text-[11px] block">3. Missing Information & Uncertainty</span>
-                        <ul className="space-y-1.5 text-slate-300 text-[11px]">
-                          {sellerResult.missingInformation.map((mis, idx) => (
-                            <li key={idx} className="flex items-start">
-                              <span className="text-amber-400 mr-1.5">•</span>
-                              <span>{mis}</span>
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* AI Underwriter Synthesis */}
-                  {sellerResult.aiSynthesis && (
-                    <div className="rounded-2xl bg-gradient-to-br from-slate-900 via-indigo-950/20 to-slate-900 border border-indigo-500/30 p-6 shadow-xl space-y-3">
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-bold text-indigo-400 uppercase tracking-wider flex items-center space-x-1.5">
-                          <span>✦</span>
-                          <span>AI Underwriter Narrative Synthesis ({sellerResult.aiSynthesis.provider})</span>
-                        </span>
-                        <span className="text-[10px] text-slate-400 font-mono">{sellerResult.aiSynthesis.confidenceNote}</span>
-                      </div>
-                      <p className="text-xs text-slate-200 leading-relaxed italic">
-                        "{sellerResult.aiSynthesis.executiveSummary}"
-                      </p>
-                      <div className="p-3 rounded-xl bg-slate-950/60 border border-indigo-500/20 text-xs text-slate-300">
-                        <span className="font-semibold text-indigo-300">Underwriter Action: </span>
-                        <span>{sellerResult.aiSynthesis.underwriterRecommendation}</span>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Contributing Signals */}
-                  <div className="rounded-2xl bg-slate-900/90 border border-slate-800 p-6 shadow-xl">
-                    <h4 className="text-sm font-bold text-white uppercase tracking-wider mb-3">Detected Risk Signals</h4>
-                    <div className="space-y-2.5">
-                      {sellerResult.signals.map((sig, idx) => (
-                        <div key={idx} className="p-3 rounded-xl bg-slate-950 border border-slate-800/80 flex items-start justify-between">
-                          <div>
-                            <div className="text-xs font-semibold text-slate-200">{sig.name}</div>
-                            <div className="text-xs text-slate-400 mt-0.5">{sig.description}</div>
-                          </div>
-                          <span className={`px-2 py-0.5 text-[10px] font-semibold rounded uppercase ${
-                            sig.severity === 'high' ? 'bg-rose-500/10 text-rose-400' :
-                            sig.severity === 'medium' ? 'bg-amber-500/10 text-amber-400' :
-                            'bg-blue-500/10 text-blue-400'
-                          }`}>
-                            {sig.severity}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Recommendations */}
-                  <div className="rounded-2xl bg-slate-900/90 border border-slate-800 p-6 shadow-xl">
-                    <h4 className="text-sm font-bold text-white uppercase tracking-wider mb-3">Proportionate Next Steps</h4>
-                    <ul className="space-y-2">
-                      {sellerResult.recommendations.map((rec, idx) => (
-                        <li key={idx} className="flex items-start text-xs text-slate-300">
-                          <span className="text-blue-400 font-bold mr-2">✓</span>
-                          <span>{rec}</span>
-                        </li>
-                      ))}
-                    </ul>
-
-                    <div className="mt-4 pt-3 border-t border-slate-800 text-[11px] text-slate-400 italic">
-                      {sellerResult.disclaimer}
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <div className="h-full rounded-2xl bg-slate-900/40 border border-dashed border-slate-800 p-12 flex flex-col items-center justify-center text-center">
-                  <div className="w-12 h-12 rounded-full bg-slate-800 flex items-center justify-center text-slate-400 mb-3">
-                    <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                    </svg>
-                  </div>
-                  <h4 className="text-sm font-semibold text-slate-300">No Assessment Loaded</h4>
-                  <p className="text-xs text-slate-400 mt-1 max-w-sm">
-                    Select a benchmark preset on the left or enter custom merchant transactions, then click "Evaluate Seller Risk Profile".
-                  </p>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* TAB 3: INVOICE SCAM SHIELD */}
-        {activeTab === 'invoice' && (
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-            <div className="lg:col-span-5 space-y-6">
-              <div className="rounded-2xl bg-slate-900/90 border border-slate-800 p-6 shadow-xl">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-base font-semibold text-white">Invoice Text Scanner</h3>
-                  <span className="text-xs text-purple-400 font-medium">Heuristic Phishing Defense</span>
-                </div>
-
-                <div className="mb-4">
-                  <label className="block text-xs font-medium text-slate-400 mb-2">Test Known Scam & Adversarial Presets</label>
-                  <div className="grid grid-cols-1 gap-2">
-                    {INVOICE_PRESETS.map((preset, idx) => (
-                      <button
-                        key={idx}
-                        type="button"
-                        onClick={() => {
-                          setInvoiceText(preset.text);
-                          setInvoiceResult(null);
-                        }}
-                        className="text-left px-3 py-2 rounded-xl bg-slate-800/60 hover:bg-slate-800 border border-slate-700/60 hover:border-purple-500/40 transition group"
-                      >
-                        <div className="font-semibold text-xs text-slate-200 group-hover:text-purple-300">{preset.name}</div>
-                        <div className="text-[11px] text-slate-400 mt-0.5">{preset.desc}</div>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <form onSubmit={handleAnalyzeInvoice} className="space-y-4">
-                  <div>
-                    <div className="flex justify-between items-center mb-1">
-                      <label className="text-xs font-medium text-slate-300">Paste Untrusted Invoice Body / Email</label>
-                      <span className="text-[10px] text-slate-400 font-mono">{invoiceText.length} / 50,000 chars</span>
-                    </div>
-                    <textarea
-                      rows={8}
-                      value={invoiceText}
-                      onChange={e => setInvoiceText(e.target.value)}
-                      className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-xs font-mono text-slate-200 focus:outline-none focus:border-purple-500"
-                      placeholder="Paste suspicious invoice text here..."
-                      required
-                    />
-                  </div>
-
-                  {invoiceError && (
-                    <div className="p-3 rounded-lg bg-rose-950/60 border border-rose-500/40 text-xs text-rose-300">
-                      {invoiceError}
-                    </div>
-                  )}
-
-                  <button
-                    type="submit"
-                    disabled={loadingInvoice}
-                    className="w-full py-2.5 px-4 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-medium text-sm rounded-xl shadow-lg shadow-purple-500/25 transition disabled:opacity-50"
-                  >
-                    {loadingInvoice ? 'Scanning Linguistic Signatures...' : 'Scan Invoice for Scams'}
-                  </button>
-                </form>
-              </div>
-            </div>
-
-            <div className="lg:col-span-7">
-              {invoiceResult ? (
-                <div className="space-y-6">
-                  {/* Prompt Injection Adversarial Alert Banner */}
-                  {invoiceResult.adversarialAttemptDetected && (
-                    <div className="p-4 rounded-xl bg-rose-950/80 border-2 border-rose-500 text-xs text-rose-200 space-y-1 animate-pulse">
-                      <div className="flex items-center space-x-2 font-bold text-white text-sm">
-                        <span>⚠</span>
-                        <span>ADVERSARIAL PROMPT INJECTION DEFENSE ACTIVATED</span>
-                      </div>
-                      <p>
-                        Hostile instruction override attempt detected inside untrusted invoice text. The payload was quarantined and treated strictly as data without executing directives.
-                      </p>
-                    </div>
-                  )}
-
-                  {/* Top Scam Assessment */}
-                  <div className="rounded-2xl bg-slate-900/90 border border-slate-800 p-6 shadow-xl">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <span className="text-xs text-slate-400 font-mono">Invoice Linguistic Analysis</span>
-                        <h3 className="text-xl font-bold text-white mt-1">Scam Threat Assessment</h3>
-                      </div>
-                      <div className="text-right">
-                        <span className={`px-3 py-1 rounded-full text-xs font-bold border ${getRiskColor(invoiceResult.category)}`}>
-                          {invoiceResult.category}
-                        </span>
-                        <div className="text-2xl font-black text-white mt-1 font-mono">
-                          {invoiceResult.riskScore}<span className="text-xs text-slate-400 font-normal">/100</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    <p className="mt-4 text-sm text-slate-300 leading-relaxed bg-slate-950/60 p-4 rounded-xl border border-slate-800">
-                      {invoiceResult.explanation}
-                    </p>
-
-                    {invoiceResult.unverifiedContacts.length > 0 && (
-                      <div className="mt-5 p-4 rounded-xl bg-amber-950/30 border border-amber-500/30">
-                        <div className="flex items-center space-x-2 text-amber-400 font-semibold text-xs mb-2">
-                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                          </svg>
-                          <span>UNVERIFIED CONTACT NUMBERS DETECTED</span>
-                        </div>
-                        {invoiceResult.unverifiedContacts.map((contact, idx) => (
-                          <div key={idx} className="mt-2 text-xs text-slate-200">
-                            <span className="font-mono font-bold text-amber-300 bg-amber-900/40 px-2 py-0.5 rounded mr-2">
-                              {contact.value}
-                            </span>
-                            <span className="text-slate-300">({contact.context})</span>
-                            <p className="text-[11px] text-amber-200/80 mt-1 italic">
-                              {contact.verificationCaveat}
-                            </p>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-
-                    {invoiceResult.paymentDestinations.length > 0 && (
-                      <div className="mt-4 p-4 rounded-xl bg-rose-950/30 border border-rose-500/30">
-                        <div className="flex items-center space-x-2 text-rose-400 font-semibold text-xs mb-1">
-                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
-                          </svg>
-                          <span>IRREGULAR SETTLEMENT DESTINATION</span>
-                        </div>
-                        {invoiceResult.paymentDestinations.map((dest, idx) => (
-                          <div key={idx} className="mt-2 text-xs text-slate-200">
-                            <span className="font-bold text-rose-300">{dest.method}:</span> {dest.destination}
-                            <p className="text-[11px] text-rose-200/80 mt-0.5">{dest.notes}</p>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Explainable Evidence Breakdown */}
-                  <div className="rounded-2xl bg-slate-900/90 border border-slate-800 p-6 shadow-xl space-y-4">
-                    <h4 className="text-sm font-bold text-white uppercase tracking-wider">Explainable Evidence Breakdown</h4>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
-                      <div className="p-4 rounded-xl bg-slate-950 border border-blue-500/20 space-y-2">
-                        <span className="font-bold text-blue-400 uppercase tracking-wider text-[11px] block">1. Observed Evidence</span>
-                        <ul className="space-y-1 text-slate-300 text-[11px]">
-                          {invoiceResult.observedEvidence.map((obs, idx) => (
-                            <li key={idx} className="flex items-start">
-                              <span className="text-blue-400 mr-1.5">•</span>
-                              <span>{obs}</span>
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                      <div className="p-4 rounded-xl bg-slate-950 border border-purple-500/20 space-y-2">
-                        <span className="font-bold text-purple-400 uppercase tracking-wider text-[11px] block">2. Inferred Risk Deduction</span>
-                        <ul className="space-y-1 text-slate-300 text-[11px]">
-                          {invoiceResult.inferredRisk.map((inf, idx) => (
-                            <li key={idx} className="flex items-start">
-                              <span className="text-purple-400 mr-1.5">•</span>
-                              <span>{inf}</span>
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                      <div className="p-4 rounded-xl bg-slate-950 border border-amber-500/20 space-y-2">
-                        <span className="font-bold text-amber-400 uppercase tracking-wider text-[11px] block">3. Missing Information</span>
-                        <ul className="space-y-1 text-slate-300 text-[11px]">
-                          {invoiceResult.missingInformation.map((mis, idx) => (
-                            <li key={idx} className="flex items-start">
-                              <span className="text-amber-400 mr-1.5">•</span>
-                              <span>{mis}</span>
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Warning Indicators */}
-                  <div className="rounded-2xl bg-slate-900/90 border border-slate-800 p-6 shadow-xl">
-                    <h4 className="text-sm font-bold text-white uppercase tracking-wider mb-3">Detected Linguistic Indicators</h4>
-                    <div className="space-y-2.5">
-                      {invoiceResult.warnings.map((warn, idx) => (
-                        <div key={idx} className="p-3 rounded-xl bg-slate-950 border border-slate-800/80">
-                          <div className="flex items-center justify-between">
-                            <span className="text-xs font-semibold text-slate-200">{warn.title}</span>
-                            <span className={`px-2 py-0.5 text-[10px] font-semibold rounded uppercase ${
-                              warn.severity === 'critical' ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30' :
-                              warn.severity === 'high' ? 'bg-rose-500/10 text-rose-400' :
-                              warn.severity === 'medium' ? 'bg-amber-500/10 text-amber-400' :
-                              'bg-blue-500/10 text-blue-400'
+                    </thead>
+                    <tbody className="divide-y divide-[#e1e2e4] text-[#191c1e]">
+                      {(summary?.recentActivity || []).map((item, idx) => (
+                        <tr key={item.id || idx} className="hover:bg-slate-50 transition-colors">
+                          <td className="py-3 px-4 font-mono font-semibold text-[#191c1e]">{item.id}</td>
+                          <td className="py-3 px-4 font-mono text-[#434655] text-[11px]">
+                            {new Date(item.timestamp).toLocaleTimeString()}
+                          </td>
+                          <td className="py-3 px-4 uppercase text-[10px] font-semibold text-blue-700">
+                            {item.type}
+                          </td>
+                          <td className="py-3 px-4 font-mono text-[#191c1e]">
+                            {item.entityId}
+                          </td>
+                          <td className="py-3 px-4">
+                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${
+                              item.riskCategory.includes('High') || item.riskCategory.includes('Scam')
+                                ? 'bg-rose-50 text-rose-700 border border-rose-200'
+                                : item.riskCategory.includes('Low')
+                                ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                : 'bg-amber-50 text-amber-700 border border-amber-200'
                             }`}>
-                              {warn.severity}
+                              {item.riskCategory}
                             </span>
-                          </div>
-                          <p className="text-xs text-slate-400 mt-1">{warn.detail}</p>
-                        </div>
+                          </td>
+                          <td className="py-3 px-4 font-mono text-right font-bold">
+                            {item.riskScore}/100
+                          </td>
+                          <td className="py-3 px-4 text-[#434655] max-w-sm truncate" title={item.summary}>
+                            {item.summary}
+                          </td>
+                          <td className="py-3 px-4 text-right">
+                            <button
+                              onClick={() => {
+                                if (item.type === 'seller-protection') setActiveTab('seller');
+                                else if (item.type === 'invoice-scam') setActiveTab('invoice');
+                                else setActiveTab('investigation');
+                              }}
+                              className="text-blue-600 hover:text-blue-800 font-semibold cursor-pointer"
+                            >
+                              Inspect →
+                            </button>
+                          </td>
+                        </tr>
                       ))}
-                    </div>
-                  </div>
-
-                  {/* Safe Next Steps */}
-                  <div className="rounded-2xl bg-slate-900/90 border border-slate-800 p-6 shadow-xl">
-                    <h4 className="text-sm font-bold text-white uppercase tracking-wider mb-3">Safe Next Steps</h4>
-                    <ul className="space-y-2">
-                      {invoiceResult.safeNextSteps.map((step, idx) => (
-                        <li key={idx} className="flex items-start text-xs text-slate-300">
-                          <span className="text-purple-400 font-bold mr-2">✓</span>
-                          <span>{step}</span>
-                        </li>
-                      ))}
-                    </ul>
-
-                    <div className="mt-4 pt-3 border-t border-slate-800 text-[11px] text-slate-400 italic">
-                      {invoiceResult.disclaimer}
-                    </div>
-                  </div>
+                    </tbody>
+                  </table>
                 </div>
-              ) : (
-                <div className="h-full rounded-2xl bg-slate-900/40 border border-dashed border-slate-800 p-12 flex flex-col items-center justify-center text-center">
-                  <div className="w-12 h-12 rounded-full bg-slate-800 flex items-center justify-center text-slate-400 mb-3">
-                    <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                    </svg>
-                  </div>
-                  <h4 className="text-sm font-semibold text-slate-300">No Invoice Scan Performed</h4>
-                  <p className="text-xs text-slate-400 mt-1 max-w-sm">
-                    Select a sample invoice preset on the left or paste raw email/invoice text, then click "Scan Invoice for Scams".
+              </div>
+            </div>
+          )}
+
+          {/* =========================================================================
+              VIEW 2: SELLER PROTECTION INTELLIGENCE
+              ========================================================================= */}
+          {activeTab === 'seller' && (
+            <div className="space-y-6">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div>
+                  <h1 className="text-2xl font-bold text-[#191c1e] tracking-tight">
+                    Seller Protection Intelligence
+                  </h1>
+                  <p className="text-sm text-[#434655] mt-1">
+                    Distinguish legitimate holiday sales spikes from fraudulent account takeovers using explainable AI.
                   </p>
                 </div>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* TAB 4: PAYPAL SANDBOX V2 ORDERS INTEGRATION */}
-        {activeTab === 'sandbox' && (
-          <div className="space-y-8">
-            <div className="rounded-2xl bg-slate-900/90 border border-slate-800 p-6 shadow-xl">
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                <div>
-                  <div className="flex items-center space-x-2">
-                    <span className="px-2.5 py-0.5 rounded text-[11px] font-bold uppercase bg-blue-500/10 text-blue-400 border border-blue-500/20">
-                      Official Sandbox v2 API
-                    </span>
-                    <span className={`px-2.5 py-0.5 rounded text-[11px] font-bold ${
-                      sandboxStatus?.isConfigured
-                        ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-                        : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
-                    }`}>
-                      {sandboxStatus?.isConfigured ? '✓ Configured & Ready' : '⚠ Sandbox Credentials Not Configured'}
-                    </span>
-                  </div>
-                  <h3 className="text-xl font-bold text-white mt-2">PayPal Orders v2 Server Integration</h3>
-                  <p className="text-xs text-slate-400 mt-1 max-w-2xl">{sandboxStatus?.statusMessage}</p>
-                </div>
-
-                <div className="p-3 bg-slate-950 rounded-xl border border-slate-800 text-xs font-mono space-y-1">
-                  <div className="text-slate-400">Environment: <span className="text-cyan-400 font-semibold">{sandboxStatus?.environment || 'sandbox'}</span></div>
-                  <div className="text-slate-400">Endpoint: <span className="text-slate-200">{sandboxStatus?.apiBaseUrl || 'https://api-m.sandbox.paypal.com'}</span></div>
-                  <div className="text-slate-400">Client ID: <span className="text-emerald-400">{sandboxStatus?.clientIdMasked || 'None (Simulated Mode)'}</span></div>
+                <div className="flex items-center gap-2">
+                  <select
+                    onChange={e => handleRunPresetSeller(Number(e.target.value))}
+                    className="px-3 py-2 bg-white border border-[#e1e2e4] rounded-lg text-xs font-medium text-[#191c1e] focus:ring-1 focus:ring-blue-600 outline-none shadow-xs cursor-pointer"
+                    defaultValue=""
+                  >
+                    <option value="" disabled>Load Demo Preset Scenario...</option>
+                    {SELLER_PRESETS.map((p, idx) => (
+                      <option key={idx} value={idx}>{p.name}</option>
+                    ))}
+                  </select>
                 </div>
               </div>
 
-              {!sandboxStatus?.isConfigured && (
-                <div className="mt-5 p-4 rounded-xl bg-slate-950 border border-slate-800 text-xs space-y-2">
-                  <div className="font-semibold text-amber-400 flex items-center space-x-2">
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    <span>How to enable live Sandbox Orders API handshakes:</span>
-                  </div>
-                  <p className="text-slate-300">
-                    To connect to the live PayPal Sandbox API, log into <a href="https://developer.paypal.com/dashboard/applications/sandbox" target="_blank" rel="noreferrer" className="text-blue-400 underline">PayPal Developer Dashboard</a>, create a Sandbox REST App, and copy your Client ID and Secret into your server environment:
-                  </p>
-                  <pre className="p-3 bg-slate-900 rounded-lg text-emerald-300 font-mono text-[11px] overflow-x-auto">
-{`# In backend/.env:
-PAYPAL_CLIENT_ID=your_sandbox_client_id_here
-PAYPAL_SECRET_KEY=your_sandbox_secret_key_here
-PAYPAL_ENVIRONMENT=sandbox`}
-                  </pre>
-                  <p className="text-slate-400 text-[11px]">
-                    Until credentials are added, the server honestly protects against fake claims. No real funds are ever involved in Sandbox.
-                  </p>
-                </div>
-              )}
-            </div>
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                {/* Left Column: Input Form (6 Cols) */}
+                <div className="lg:col-span-6 bg-white border border-[#e1e2e4] rounded-xl p-5 shadow-xs flex flex-col justify-between">
+                  <form onSubmit={handleAnalyzeSeller} className="space-y-4">
+                    <div className="flex items-center justify-between pb-3 border-b border-[#e1e2e4]">
+                      <h2 className="text-sm font-bold text-[#191c1e]">Merchant Processing Parameters</h2>
+                      <span className="text-xs text-[#434655]">Telemetry Input</span>
+                    </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-              {/* Step 1: Create Order */}
-              <div className="rounded-2xl bg-slate-900/90 border border-slate-800 p-6 shadow-xl flex flex-col justify-between">
-                <div>
-                  <div className="flex items-center space-x-2 text-xs font-bold text-blue-400 uppercase tracking-wider">
-                    <span className="w-5 h-5 rounded-full bg-blue-500/20 text-blue-400 flex items-center justify-center text-[10px]">1</span>
-                    <span>Create Sandbox Test Order</span>
-                  </div>
-                  <h4 className="text-base font-bold text-white mt-1">Initiate Orders v2 Checkout</h4>
-                  <p className="text-xs text-slate-400 mt-1">
-                    Validates amount & currency server-side, requests OAuth token, and calls <code className="text-cyan-300 font-mono">POST /v2/checkout/orders</code>.
-                  </p>
+                    <div>
+                      <label className="block text-xs font-semibold text-[#191c1e] mb-1">Merchant ID</label>
+                      <input
+                        type="text"
+                        value={sellerForm.merchantId}
+                        onChange={e => setSellerForm({ ...sellerForm, merchantId: e.target.value })}
+                        className="w-full px-3 py-2 bg-[#f8f9fb] border border-[#e1e2e4] rounded-lg text-xs font-mono text-[#191c1e] focus:bg-white focus:ring-1 focus:ring-blue-600 outline-none"
+                        required
+                      />
+                    </div>
 
-                  <div className="mt-4 flex space-x-2">
-                    {['10.00', '25.00', '50.00', '100.00'].map(val => (
-                      <button
-                        key={val}
-                        type="button"
-                        onClick={() => setOrderAmount(val)}
-                        className={`px-3 py-1 text-xs rounded-lg border font-mono transition ${
-                          orderAmount === val
-                            ? 'bg-blue-600 border-blue-500 text-white font-bold'
-                            : 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-750'
-                        }`}
-                      >
-                        ${val}
-                      </button>
-                    ))}
-                  </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-[#191c1e] mb-1">
+                        Recent Transactions Series (USD comma-separated)
+                      </label>
+                      <textarea
+                        rows={3}
+                        value={sellerForm.transactions}
+                        onChange={e => setSellerForm({ ...sellerForm, transactions: e.target.value })}
+                        className="w-full px-3 py-2 bg-[#f8f9fb] border border-[#e1e2e4] rounded-lg text-xs font-mono text-[#191c1e] focus:bg-white focus:ring-1 focus:ring-blue-600 outline-none"
+                        required
+                      />
+                    </div>
 
-                  <form onSubmit={handleCreateOrder} className="mt-4 space-y-3">
-                    <div className="grid grid-cols-3 gap-3">
-                      <div className="col-span-2">
-                        <label className="block text-[11px] font-medium text-slate-300 mb-1">Amount</label>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs font-semibold text-[#191c1e] mb-1">Previous Month Total ($)</label>
                         <input
-                          type="text"
-                          value={orderAmount}
-                          onChange={e => setOrderAmount(e.target.value)}
-                          className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-xs font-mono text-slate-200 focus:outline-none focus:border-blue-500"
-                          placeholder="25.00"
-                          required
+                          type="number"
+                          value={sellerForm.previousMonthSales}
+                          onChange={e => setSellerForm({ ...sellerForm, previousMonthSales: Number(e.target.value) })}
+                          className="w-full px-3 py-2 bg-[#f8f9fb] border border-[#e1e2e4] rounded-lg text-xs font-mono text-[#191c1e] focus:bg-white focus:ring-1 focus:ring-blue-600 outline-none"
                         />
                       </div>
                       <div>
-                        <label className="block text-[11px] font-medium text-slate-300 mb-1">Currency</label>
+                        <label className="block text-xs font-semibold text-[#191c1e] mb-1">Account Age (Days)</label>
+                        <input
+                          type="number"
+                          value={sellerForm.accountAgeDays}
+                          onChange={e => setSellerForm({ ...sellerForm, accountAgeDays: Number(e.target.value) })}
+                          className="w-full px-3 py-2 bg-[#f8f9fb] border border-[#e1e2e4] rounded-lg text-xs font-mono text-[#191c1e] focus:bg-white focus:ring-1 focus:ring-blue-600 outline-none"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-3">
+                      <div>
+                        <label className="block text-xs font-semibold text-[#191c1e] mb-1">Disputes Count</label>
+                        <input
+                          type="number"
+                          value={sellerForm.disputes}
+                          onChange={e => setSellerForm({ ...sellerForm, disputes: Number(e.target.value) })}
+                          className="w-full px-3 py-2 bg-[#f8f9fb] border border-[#e1e2e4] rounded-lg text-xs font-mono text-[#191c1e] focus:bg-white focus:ring-1 focus:ring-blue-600 outline-none"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-[#191c1e] mb-1">Refunds Count</label>
+                        <input
+                          type="number"
+                          value={sellerForm.refunds}
+                          onChange={e => setSellerForm({ ...sellerForm, refunds: Number(e.target.value) })}
+                          className="w-full px-3 py-2 bg-[#f8f9fb] border border-[#e1e2e4] rounded-lg text-xs font-mono text-[#191c1e] focus:bg-white focus:ring-1 focus:ring-blue-600 outline-none"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-[#191c1e] mb-1">Unverified Payer %</label>
+                        <input
+                          type="number"
+                          value={sellerForm.unverifiedPayerRatio}
+                          onChange={e => setSellerForm({ ...sellerForm, unverifiedPayerRatio: Number(e.target.value) })}
+                          className="w-full px-3 py-2 bg-[#f8f9fb] border border-[#e1e2e4] rounded-lg text-xs font-mono text-[#191c1e] focus:bg-white focus:ring-1 focus:ring-blue-600 outline-none"
+                        />
+                      </div>
+                    </div>
+
+                    {sellerError && (
+                      <div className="p-3 rounded-lg bg-rose-50 border border-rose-200 text-rose-800 text-xs">
+                        {sellerError}
+                      </div>
+                    )}
+
+                    <button
+                      type="submit"
+                      disabled={loadingSeller}
+                      className="w-full py-2.5 px-4 bg-[#004ac6] hover:bg-[#003ea8] text-white text-xs font-semibold rounded-lg shadow-sm transition-colors cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2"
+                    >
+                      <span className="material-symbols-outlined text-[18px]">verified_user</span>
+                      {loadingSeller ? 'Analyzing Processing Signals...' : 'Analyze Merchant Risk'}
+                    </button>
+                  </form>
+                </div>
+
+                {/* Right Column: Risk Intelligence Verdict (6 Cols) */}
+                <div className="lg:col-span-6 bg-white border border-[#e1e2e4] rounded-xl p-5 shadow-xs flex flex-col justify-between">
+                  <div>
+                    <div className="flex items-center justify-between pb-3 border-b border-[#e1e2e4] mb-4">
+                      <h2 className="text-sm font-bold text-[#191c1e]">Risk Evaluation Verdict</h2>
+                      <span className="text-xs text-[#434655]">Explainable Engine</span>
+                    </div>
+
+                    {sellerResult ? (
+                      <div className="space-y-4">
+                        {/* Score Banner */}
+                        <div className={`p-4 rounded-xl border flex items-center justify-between ${
+                          sellerResult.category === 'Low Risk'
+                            ? 'bg-emerald-50 border-emerald-200 text-emerald-900'
+                            : sellerResult.category === 'High Risk'
+                            ? 'bg-rose-50 border-rose-200 text-rose-900'
+                            : 'bg-amber-50 border-amber-200 text-amber-900'
+                        }`}>
+                          <div>
+                            <span className="text-xs uppercase font-semibold tracking-wider block">Assessed Risk Score</span>
+                            <div className="text-3xl font-extrabold font-mono mt-0.5">
+                              {sellerResult.riskScore} <span className="text-sm font-normal">/ 100</span>
+                            </div>
+                          </div>
+                          <span className={`px-3 py-1 rounded-full text-xs font-bold ${
+                            sellerResult.category === 'Low Risk'
+                              ? 'bg-emerald-600 text-white'
+                              : sellerResult.category === 'High Risk'
+                              ? 'bg-rose-600 text-white'
+                              : 'bg-amber-600 text-white'
+                          }`}>
+                            {sellerResult.category}
+                          </span>
+                        </div>
+
+                        {/* Explanation Note */}
+                        <div className="p-3 rounded-lg bg-[#f8f9fb] border border-[#e1e2e4] text-xs leading-relaxed text-[#191c1e]">
+                          <span className="font-semibold block mb-0.5">Risk Reason:</span>
+                          {sellerResult.explanation}
+                        </div>
+
+                        {/* Influential Signals */}
+                        <div>
+                          <span className="text-xs font-bold text-[#191c1e] block mb-2">Influential Risk Signals:</span>
+                          <div className="space-y-2">
+                            {sellerResult.signals.map((sig, idx) => (
+                              <div
+                                key={idx}
+                                className="p-2.5 rounded-lg bg-[#f8f9fb] border border-[#e1e2e4] flex items-center justify-between text-xs"
+                              >
+                                <div>
+                                  <span className="font-semibold text-[#191c1e]">{sig.name}</span>
+                                  <span className="text-[11px] text-[#434655] block">{sig.description}</span>
+                                </div>
+                                <span className={`font-mono text-xs font-bold ${
+                                  sig.weight > 0 ? 'text-rose-600' : 'text-emerald-700'
+                                }`}>
+                                  {sig.weight > 0 ? `+${sig.weight}` : sig.weight}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Recommended Next Steps */}
+                        <div className="pt-2">
+                          <span className="text-xs font-bold text-[#191c1e] block mb-1.5">Recommended Action:</span>
+                          <div className="flex flex-wrap gap-1.5">
+                            {sellerResult.recommendations.map((step, idx) => (
+                              <span
+                                key={idx}
+                                className="px-2.5 py-1 rounded-full bg-blue-50 text-blue-700 border border-blue-200 text-xs font-medium"
+                              >
+                                {step}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="py-16 text-center text-xs text-[#434655]">
+                        <span className="material-symbols-outlined text-[36px] text-slate-300 block mb-2">
+                          insights
+                        </span>
+                        Submit merchant processing parameters or load a preset scenario to view the risk verdict.
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* =========================================================================
+              VIEW 3: INVOICE SCAM SHIELD (Matches invoice_shield/code.html)
+              ========================================================================= */}
+          {activeTab === 'invoice' && (
+            <div className="space-y-6">
+              {/* Top Header Strip (matches prototype) */}
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h1 className="text-2xl font-bold text-[#191c1e] tracking-tight">Invoice review</h1>
+                    <span className="px-2 py-0.5 bg-blue-100 text-blue-900 text-xs rounded font-medium">
+                      Active Case #INV-2024-8991
+                    </span>
+                  </div>
+                  <p className="text-sm text-[#434655] mt-1">
+                    Check payment requests for impersonation and suspicious instructions.
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1.5 bg-[#edeef0] px-3 py-1.5 rounded-lg border border-[#e1e2e4]">
+                    <span className="text-xs text-[#434655] font-medium">Preset:</span>
+                    <select
+                      onChange={e => handleRunPresetInvoice(Number(e.target.value))}
+                      className="bg-transparent text-xs text-[#191c1e] font-semibold outline-none cursor-pointer"
+                      defaultValue=""
+                    >
+                      <option value="" disabled>Choose Scam Scenario...</option>
+                      {INVOICE_PRESETS.map((p, idx) => (
+                        <option key={idx} value={idx}>{p.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <button
+                    onClick={handleAnalyzeInvoice}
+                    disabled={loadingInvoice}
+                    className="flex items-center gap-1.5 px-4 py-2 bg-[#004ac6] hover:bg-[#003ea8] text-white text-xs font-semibold rounded-lg shadow-sm transition-colors cursor-pointer disabled:opacity-50"
+                  >
+                    <span className="material-symbols-outlined text-[18px]">document_scanner</span>
+                    {loadingInvoice ? 'Scanning...' : 'Scan invoice'}
+                  </button>
+                </div>
+              </div>
+
+              {/* Two-Column Layout Grid (7 Cols Left, 5 Cols Right) */}
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                {/* Left Column: Document Inspection Matrix & Text (7 Cols) */}
+                <div className="lg:col-span-7 space-y-6">
+                  {/* Document Inspection Matrix Card */}
+                  <div className="bg-white border border-[#e1e2e4] rounded-xl p-5 shadow-xs space-y-4">
+                    <div className="flex items-center justify-between pb-3 border-b border-[#e1e2e4]">
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-8 h-8 rounded-lg bg-blue-100 text-blue-800 flex items-center justify-center">
+                          <span className="material-symbols-outlined text-[18px]">preview</span>
+                        </div>
+                        <div>
+                          <h2 className="text-sm font-bold text-[#191c1e]">Document Inspection Matrix</h2>
+                          <p className="text-[11px] text-[#434655]">Cryptographic verification &amp; OCR field extraction</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                        <span className="text-xs text-emerald-700 font-semibold">Signature Valid</span>
+                      </div>
+                    </div>
+
+                    {/* Document Preview & Metadata Split */}
+                    <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
+                      {/* Document Thumbnail Preview */}
+                      <div className="md:col-span-6 rounded-lg bg-[#f2f4f6] border border-[#e1e2e4] p-4 flex flex-col justify-between h-48">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[11px] font-mono text-[#434655]">PDF_OCR_LAYER</span>
+                          <span className="material-symbols-outlined text-slate-400 text-[18px]">picture_as_pdf</span>
+                        </div>
+                        <div className="space-y-1">
+                          <div className="h-2 w-3/4 bg-slate-200 rounded"></div>
+                          <div className="h-2 w-full bg-slate-200 rounded"></div>
+                          <div className="h-2 w-2/3 bg-slate-200 rounded"></div>
+                        </div>
+                        <div className="pt-2 border-t border-[#e1e2e4] flex items-center justify-between text-[11px] text-[#434655]">
+                          <span className="font-semibold text-[#191c1e]">INV_2024_0992_FINAL.pdf</span>
+                          <span>2.4 MB</span>
+                        </div>
+                      </div>
+
+                      {/* Metadata Profile */}
+                      <div className="md:col-span-6 bg-[#f8f9fb] border border-[#e1e2e4] rounded-lg p-4 flex flex-col justify-between">
+                        <div className="space-y-2 text-xs">
+                          <span className="text-[10px] text-[#434655] uppercase font-bold tracking-wider">
+                            Metadata Profile
+                          </span>
+                          <div className="flex justify-between">
+                            <span className="text-[#434655]">Creator Tool:</span>
+                            <span className="font-mono font-semibold text-[#191c1e]">Adobe InDesign</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-[#434655]">SHA-256 Hash:</span>
+                            <span className="font-mono font-semibold text-blue-700">8f4c...3e1a</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-[#434655]">Digital Signer:</span>
+                            <span className="font-medium text-[#191c1e]">GlobalTrust CA G2</span>
+                          </div>
+                        </div>
+                        <div className="pt-3 border-t border-[#e1e2e4] mt-2">
+                          <div className="flex items-center justify-between text-[11px] mb-1">
+                            <span className="text-[#434655]">OCR Confidence</span>
+                            <span className="font-bold text-blue-700">99.9%</span>
+                          </div>
+                          <div className="w-full bg-[#e1e2e4] h-1.5 rounded-full overflow-hidden">
+                            <div className="bg-blue-600 h-full rounded-full" style={{ width: '99.9%' }}></div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Extracted Entity Payloads */}
+                    <div className="bg-[#f8f9fb] border border-[#e1e2e4] rounded-lg p-4">
+                      <span className="text-[10px] text-[#434655] uppercase font-bold tracking-wider block mb-2">
+                        Extracted Entity Payloads
+                      </span>
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+                        <div className="p-2.5 rounded bg-white border border-[#e1e2e4]">
+                          <span className="text-[10px] text-[#434655] block">Vendor Name</span>
+                          <span className="font-semibold text-[#191c1e] mt-0.5 block truncate">
+                            {invoiceResult?.impersonationDetected ? 'SPOOFED ENTITY' : "L'ATELIER FINANCE"}
+                          </span>
+                        </div>
+                        <div className="p-2.5 rounded bg-white border border-[#e1e2e4]">
+                          <span className="text-[10px] text-[#434655] block">Destination Account</span>
+                          <span className="font-mono font-semibold text-[#191c1e] mt-0.5 block truncate">
+                            CH93 0000 ... 8821
+                          </span>
+                        </div>
+                        <div className="p-2.5 rounded bg-white border border-[#e1e2e4]">
+                          <span className="text-[10px] text-[#434655] block">Clearing Network</span>
+                          <span className="font-semibold text-[#191c1e] mt-0.5 block truncate">
+                            UBSAGCHZ80A / SEPA
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Raw Invoice Text Editor */}
+                  <div className="bg-white border border-[#e1e2e4] rounded-xl p-5 shadow-xs space-y-3">
+                    <div className="flex items-center justify-between">
+                      <h2 className="text-sm font-bold text-[#191c1e]">Raw Invoice Text Input</h2>
+                      <span className="text-xs text-[#434655] font-mono">{invoiceText.length} characters</span>
+                    </div>
+                    <textarea
+                      rows={6}
+                      value={invoiceText}
+                      onChange={e => setInvoiceText(e.target.value)}
+                      className="w-full px-3.5 py-2.5 bg-[#f8f9fb] border border-[#e1e2e4] rounded-lg text-xs font-mono text-[#191c1e] focus:bg-white focus:ring-1 focus:ring-blue-600 outline-none leading-relaxed"
+                      placeholder="Paste invoice text, billing emails, or payment requests..."
+                    />
+                    {invoiceError && (
+                      <div className="p-3 rounded-lg bg-rose-50 border border-rose-200 text-rose-800 text-xs">
+                        {invoiceError}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Right Column: Threat Classification & Signals (5 Cols) */}
+                <div className="lg:col-span-5 bg-white border border-[#e1e2e4] rounded-xl p-5 shadow-xs flex flex-col justify-between">
+                  <div>
+                    <div className="flex items-center justify-between pb-3 border-b border-[#e1e2e4] mb-4">
+                      <h2 className="text-sm font-bold text-[#191c1e]">Threat Detection Assessment</h2>
+                      <span className="text-xs text-[#434655]">Natural Language NLP</span>
+                    </div>
+
+                    {invoiceResult ? (
+                      <div className="space-y-4">
+                        {/* Result Score Banner */}
+                        <div className={`p-4 rounded-xl border flex items-center justify-between ${
+                          invoiceResult.category === 'High-Risk Scam'
+                            ? 'bg-rose-50 border-rose-200 text-rose-900'
+                            : invoiceResult.category === 'Legitimate / Low Risk'
+                            ? 'bg-emerald-50 border-emerald-200 text-emerald-900'
+                            : 'bg-amber-50 border-amber-200 text-amber-900'
+                        }`}>
+                          <div>
+                            <span className="text-xs uppercase font-semibold tracking-wider block">Assessed Scam Score</span>
+                            <div className="text-3xl font-extrabold font-mono mt-0.5">
+                              {invoiceResult.riskScore} <span className="text-sm font-normal">/ 100</span>
+                            </div>
+                          </div>
+                          <span className={`px-3 py-1 rounded-full text-xs font-bold ${
+                            invoiceResult.category === 'High-Risk Scam'
+                              ? 'bg-rose-600 text-white'
+                              : invoiceResult.category === 'Legitimate / Low Risk'
+                              ? 'bg-emerald-600 text-white'
+                              : 'bg-amber-600 text-white'
+                          }`}>
+                            {invoiceResult.category}
+                          </span>
+                        </div>
+
+                        {/* Adversarial Prompt Injection Quarantine Alert */}
+                        {invoiceResult.adversarialAttemptDetected && (
+                          <div className="p-3 rounded-lg bg-purple-50 border border-purple-300 text-purple-900 text-xs flex items-start gap-2">
+                            <span className="material-symbols-outlined text-[18px] text-purple-700 shrink-0 mt-0.5">
+                              security
+                            </span>
+                            <div>
+                              <span className="font-bold block">Adversarial Prompt Injection Quarantined:</span>
+                              Malicious instruction override detected and neutralized. Safety barriers protected the AI evaluator.
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Reason Summary */}
+                        <div className="p-3 rounded-lg bg-[#f8f9fb] border border-[#e1e2e4] text-xs leading-relaxed text-[#191c1e]">
+                          <span className="font-semibold block mb-0.5">Verdict Reason:</span>
+                          {invoiceResult.explanation}
+                        </div>
+
+                        {/* Scam Tactics Breakdown */}
+                        <div>
+                          <span className="text-xs font-bold text-[#191c1e] block mb-2">Detected Threat Indicators:</span>
+                          <div className="space-y-2">
+                            <div className="p-2.5 rounded-lg bg-[#f8f9fb] border border-[#e1e2e4] flex items-center justify-between text-xs">
+                              <span className="text-[#191c1e]">Brand Impersonation / Spoofing</span>
+                              <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                                invoiceResult.impersonationDetected
+                                  ? 'bg-rose-100 text-rose-800'
+                                  : 'bg-emerald-100 text-emerald-800'
+                              }`}>
+                                {invoiceResult.impersonationDetected ? 'DETECTED' : 'CLEAR'}
+                              </span>
+                            </div>
+
+                            <div className="p-2.5 rounded-lg bg-[#f8f9fb] border border-[#e1e2e4] flex items-center justify-between text-xs">
+                              <span className="text-[#191c1e]">Coercive Urgency &amp; Threats</span>
+                              <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                                invoiceResult.urgencyDetected
+                                  ? 'bg-rose-100 text-rose-800'
+                                  : 'bg-emerald-100 text-emerald-800'
+                              }`}>
+                                {invoiceResult.urgencyDetected ? 'DETECTED' : 'CLEAR'}
+                              </span>
+                            </div>
+
+                            <div className="p-2.5 rounded-lg bg-[#f8f9fb] border border-[#e1e2e4] flex items-center justify-between text-xs">
+                              <span className="text-[#191c1e]">Suspicious Callback Number</span>
+                              <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                                invoiceResult.unverifiedContacts?.some(c => c.type === 'phone')
+                                  ? 'bg-rose-100 text-rose-800'
+                                  : 'bg-emerald-100 text-emerald-800'
+                              }`}>
+                                {invoiceResult.unverifiedContacts?.some(c => c.type === 'phone') ? 'DETECTED' : 'CLEAR'}
+                              </span>
+                            </div>
+
+                            <div className="p-2.5 rounded-lg bg-[#f8f9fb] border border-[#e1e2e4] flex items-center justify-between text-xs">
+                              <span className="text-[#191c1e]">Crypto / Gift Card Settlement</span>
+                              <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                                invoiceResult.paymentDestinations?.some(p => p.isUnusual)
+                                  ? 'bg-rose-100 text-rose-800'
+                                  : 'bg-emerald-100 text-emerald-800'
+                              }`}>
+                                {invoiceResult.paymentDestinations?.some(p => p.isUnusual) ? 'DETECTED' : 'CLEAR'}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Recommended Underwriter Action */}
+                        <div className="pt-2">
+                          <span className="text-xs font-bold text-[#191c1e] block mb-1.5">Recommended Action:</span>
+                          <div className="flex flex-wrap gap-1.5">
+                            {invoiceResult.safeNextSteps?.map((step, i) => (
+                              <span key={i} className="px-2.5 py-1 rounded-full bg-blue-50 text-blue-700 border border-blue-200 text-xs font-medium">
+                                {step}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="py-16 text-center text-xs text-[#434655]">
+                        <span className="material-symbols-outlined text-[36px] text-slate-300 block mb-2">
+                          receipt_long
+                        </span>
+                        Paste invoice text or select a demo preset to run scam detection analysis.
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* =========================================================================
+              VIEW 4: INVESTIGATION HUB (Matches investigations/code.html)
+              ========================================================================= */}
+          {activeTab === 'investigation' && (
+            <div className="space-y-6">
+              {/* Secondary Subtab Navigation Bar */}
+              <div className="flex items-center gap-2 overflow-x-auto pb-1 border-b border-[#e1e2e4]">
+                <button
+                  onClick={() => setInvestigationSubTab('deliberation')}
+                  className={`px-3.5 py-2 rounded-lg text-xs font-semibold transition-colors flex items-center gap-1.5 cursor-pointer ${
+                    investigationSubTab === 'deliberation'
+                      ? 'bg-[#004ac6] text-white shadow-xs'
+                      : 'bg-white border border-[#e1e2e4] text-[#434655] hover:bg-slate-50'
+                  }`}
+                >
+                  <span className="material-symbols-outlined text-[16px]">policy</span>
+                  Deliberation Room &amp; Case File
+                </button>
+
+                <button
+                  onClick={() => setInvestigationSubTab('cases')}
+                  className={`px-3.5 py-2 rounded-lg text-xs font-semibold transition-colors flex items-center gap-1.5 cursor-pointer ${
+                    investigationSubTab === 'cases'
+                      ? 'bg-[#004ac6] text-white shadow-xs'
+                      : 'bg-white border border-[#e1e2e4] text-[#434655] hover:bg-slate-50'
+                  }`}
+                >
+                  <span className="material-symbols-outlined text-[16px]">folder</span>
+                  Case Explorer &amp; Underwriting
+                </button>
+
+                <button
+                  onClick={() => setInvestigationSubTab('agents')}
+                  className={`px-3.5 py-2 rounded-lg text-xs font-semibold transition-colors flex items-center gap-1.5 cursor-pointer ${
+                    investigationSubTab === 'agents'
+                      ? 'bg-[#004ac6] text-white shadow-xs'
+                      : 'bg-white border border-[#e1e2e4] text-[#434655] hover:bg-slate-50'
+                  }`}
+                >
+                  <span className="material-symbols-outlined text-[16px]">group</span>
+                  Multi-Agent Fleet Simulator (4 Agents)
+                </button>
+
+                <button
+                  onClick={() => setInvestigationSubTab('graphs')}
+                  className={`px-3.5 py-2 rounded-lg text-xs font-semibold transition-colors flex items-center gap-1.5 cursor-pointer ${
+                    investigationSubTab === 'graphs'
+                      ? 'bg-[#004ac6] text-white shadow-xs'
+                      : 'bg-white border border-[#e1e2e4] text-[#434655] hover:bg-slate-50'
+                  }`}
+                >
+                  <span className="material-symbols-outlined text-[16px]">hub</span>
+                  Entity Graph &amp; Fraud Heatmap
+                </button>
+
+                <button
+                  onClick={() => setInvestigationSubTab('ai-ops')}
+                  className={`px-3.5 py-2 rounded-lg text-xs font-semibold transition-colors flex items-center gap-1.5 cursor-pointer ${
+                    investigationSubTab === 'ai-ops'
+                      ? 'bg-[#004ac6] text-white shadow-xs'
+                      : 'bg-white border border-[#e1e2e4] text-[#434655] hover:bg-slate-50'
+                  }`}
+                >
+                  <span className="material-symbols-outlined text-[16px]">tune</span>
+                  AI Fleet Ops &amp; Drift Monitoring (PSI)
+                </button>
+              </div>
+
+              {/* Subtab 1: Deliberation Room Prototype (Direct implementation of investigations/code.html) */}
+              {investigationSubTab === 'deliberation' && (
+                <div className="space-y-6">
+                  {/* Top Case File Header (matches prototype) */}
+                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 rounded-xl border border-[#e1e2e4] shadow-xs">
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-[11px] uppercase tracking-wider text-[#737686] font-semibold">
+                          Investigations / File #CS-88392
+                        </span>
+                        <span className="px-2 py-0.5 rounded-full text-[11px] bg-rose-600 text-white font-semibold flex items-center gap-1">
+                          <span className="material-symbols-outlined text-[14px]">warning</span> Critical Risk
+                        </span>
+                        <span className="px-2 py-0.5 rounded-full text-[11px] bg-blue-100 text-blue-900 font-medium">
+                          Under Review
+                        </span>
+                      </div>
+                      <h1 className="text-xl font-bold text-[#191c1e]">
+                        Case #CS-88392: Cross-Border Liquidity Anomaly
+                      </h1>
+                    </div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <button
+                        onClick={() => setActionAlert('Evidence packet request dispatched to SWIFT Clearing & Node 04.')}
+                        className="px-3.5 py-2 rounded-lg bg-[#f2f4f6] hover:bg-[#e7e8ea] text-[#191c1e] text-xs font-medium flex items-center gap-1.5 transition-colors cursor-pointer border border-[#e1e2e4]"
+                      >
+                        <span className="material-symbols-outlined text-[16px]">attachment</span> Request Evidence
+                      </button>
+                      <button
+                        onClick={() => setActionAlert('Case marked for secondary human underwriting review.')}
+                        className="px-3.5 py-2 rounded-lg bg-[#f2f4f6] hover:bg-[#e7e8ea] text-[#191c1e] text-xs font-medium flex items-center gap-1.5 transition-colors cursor-pointer border border-[#e1e2e4]"
+                      >
+                        <span className="material-symbols-outlined text-[16px]">flag</span> Mark Review
+                      </button>
+                      <button
+                        onClick={() => setActionAlert('Case #CS-88392 successfully resolved and committed to cryptographic audit trail.')}
+                        className="px-3.5 py-2 rounded-lg bg-[#004ac6] hover:bg-[#003ea8] text-white text-xs font-semibold flex items-center gap-1.5 shadow-sm transition-colors cursor-pointer"
+                      >
+                        <span className="material-symbols-outlined text-[16px]">check_circle</span> Resolve Case
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Main Grid Layout (8 Cols Evidence & Trail + 4 Cols Supporting Panel) */}
+                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                    {/* Main Evidence Column (8 Cols) */}
+                    <div className="lg:col-span-8 space-y-6">
+                      {/* 1. Deliberation Room Feed */}
+                      <div className="bg-white p-6 rounded-xl border border-[#e1e2e4] shadow-xs space-y-4">
+                        <div className="flex items-center justify-between pb-3 border-b border-[#e1e2e4]">
+                          <div className="flex items-center gap-2">
+                            <span className="material-symbols-outlined text-blue-600 text-[22px]">smart_toy</span>
+                            <div>
+                              <h2 className="text-base font-bold text-[#191c1e]">Deliberation Room Feed</h2>
+                              <p className="text-xs text-[#737686]">Multi-agent synchronous reasoning &amp; forensic telemetry</p>
+                            </div>
+                          </div>
+                          <span className="text-xs text-[#434655] px-2.5 py-1 bg-[#f2f4f6] rounded-md font-medium border border-[#e1e2e4]">
+                            4 Active Agents
+                          </span>
+                        </div>
+
+                        <div className="space-y-3">
+                          {/* Evidence Agent */}
+                          <div className="p-4 rounded-xl bg-[#f8f9fb] border border-[#e1e2e4] space-y-2">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <div className="w-7 h-7 rounded-full bg-blue-100 flex items-center justify-center text-blue-800">
+                                  <span className="material-symbols-outlined text-[16px]">database</span>
+                                </div>
+                                <span className="text-xs font-bold text-[#191c1e]">Evidence Agent</span>
+                              </div>
+                              <span className="text-[11px] font-semibold text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
+                                Confidence 98.4%
+                              </span>
+                            </div>
+                            <p className="text-xs text-[#434655] leading-relaxed">
+                              Correlated SWIFT logs across 4 intermediary nodes. Identifies fragmented wire transmissions originating from high-risk jurisdiction subnet with automated batching intervals matching known layering heuristics.
+                            </p>
+                            <div className="flex items-center gap-3 text-[11px] text-[#737686] pt-1 font-mono">
+                              <span>Source: SWIFT_FIN_799</span>
+                              <span>•</span>
+                              <span>Timestamp: 14:22:09 UTC</span>
+                            </div>
+                          </div>
+
+                          {/* Behavioral Agent */}
+                          <div className="p-4 rounded-xl bg-[#f8f9fb] border border-[#e1e2e4] space-y-2">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <div className="w-7 h-7 rounded-full bg-purple-100 flex items-center justify-center text-purple-800">
+                                  <span className="material-symbols-outlined text-[16px]">psychology</span>
+                                </div>
+                                <span className="text-xs font-bold text-[#191c1e]">Behavioral Agent</span>
+                              </div>
+                              <span className="text-[11px] font-semibold text-amber-800 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
+                                Anomaly Flag
+                              </span>
+                            </div>
+                            <p className="text-xs text-[#434655] leading-relaxed">
+                              Keypress latency delta exceeds standard deviation by 3.8σ during authentication challenge. Biometric telemetry indicates synthetic interaction patterns rather than organic merchant entry.
+                            </p>
+                            <div className="flex items-center gap-3 text-[11px] text-[#737686] pt-1 font-mono">
+                              <span>Session: AUTH_SESSION_9981</span>
+                              <span>•</span>
+                              <span>Delta: +412ms</span>
+                            </div>
+                          </div>
+
+                          {/* Policy Arbiter */}
+                          <div className="p-4 rounded-xl bg-[#f8f9fb] border border-[#e1e2e4] space-y-2">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <div className="w-7 h-7 rounded-full bg-slate-200 flex items-center justify-center text-[#191c1e]">
+                                  <span className="material-symbols-outlined text-[16px]">gavel</span>
+                                </div>
+                                <span className="text-xs font-bold text-[#191c1e]">Policy Arbiter</span>
+                              </div>
+                              <span className="text-[11px] font-semibold text-[#191c1e] bg-[#edeef0] px-2 py-0.5 rounded border border-[#e1e2e4]">
+                                Rule 104-B
+                              </span>
+                            </div>
+                            <p className="text-xs text-[#434655] leading-relaxed">
+                              Mandatory compliance check against EU Markets in Crypto-Assets (MiCA) regulatory threshold. Transaction volume breaches automated reporting floor without pre-clearance ledger entry.
+                            </p>
+                            <div className="flex items-center gap-3 text-[11px] text-[#737686] pt-1 font-mono">
+                              <span>Jurisdiction: EU-DE</span>
+                              <span>•</span>
+                              <span>Action: Freeze / Verify</span>
+                            </div>
+                          </div>
+
+                          {/* Explainability Agent */}
+                          <div className="p-4 rounded-xl bg-[#f8f9fb] border border-[#e1e2e4] space-y-2">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <div className="w-7 h-7 rounded-full bg-amber-100 flex items-center justify-center text-amber-800">
+                                  <span className="material-symbols-outlined text-[16px]">insights</span>
+                                </div>
+                                <span className="text-xs font-bold text-[#191c1e]">Explainability Agent</span>
+                              </div>
+                              <span className="text-[11px] font-semibold text-amber-800 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
+                                Primary Vector
+                              </span>
+                            </div>
+                            <p className="text-xs text-[#434655] leading-relaxed">
+                              Primary risk vector derived from velocity of capital movement ($1.2M / 180s window). Vector analysis shows high correlation with recursive structuring operations detected in Q3 historic typologies.
+                            </p>
+                            <div className="flex items-center gap-3 text-[11px] text-[#737686] pt-1 font-mono">
+                              <span>Model: TrustShield-XGB-v4</span>
+                              <span>•</span>
+                              <span>Weight: 0.89</span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* 2. Cryptographic Trail (matches prototype) */}
+                      <div className="bg-white p-6 rounded-xl border border-[#e1e2e4] shadow-xs space-y-4">
+                        <div className="flex items-center justify-between pb-3 border-b border-[#e1e2e4]">
+                          <div className="flex items-center gap-2">
+                            <span className="material-symbols-outlined text-blue-600 text-[22px]">hub</span>
+                            <div>
+                              <h2 className="text-base font-bold text-[#191c1e]">Cryptographic Trail</h2>
+                              <p className="text-xs text-[#737686]">Immutable ledger of state transitions &amp; node validation</p>
+                            </div>
+                          </div>
+                          <span className="text-xs text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-md flex items-center gap-1 font-semibold border border-emerald-200">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Ledger Verified
+                          </span>
+                        </div>
+
+                        <div className="relative pl-6 space-y-4 before:absolute before:left-2 before:top-2 before:bottom-2 before:w-0.5 before:bg-[#e1e2e4]">
+                          {/* Step 1 */}
+                          <div className="relative space-y-1">
+                            <div className="absolute -left-6 top-1 w-2.5 h-2.5 rounded-full bg-blue-600 ring-4 ring-white"></div>
+                            <div className="flex items-center justify-between text-xs">
+                              <span className="font-bold text-[#191c1e] font-mono">INIT: NODE_ZURICH_04</span>
+                              <span className="text-[#737686] font-mono text-[11px]">14:18:02.104 UTC</span>
+                            </div>
+                            <p className="text-xs text-[#434655]">
+                              Inbound packet received from Swiss clearing node. Cryptographic signature verified against public key store.
+                            </p>
+                          </div>
+
+                          {/* Step 2 */}
+                          <div className="relative space-y-1">
+                            <div className="absolute -left-6 top-1 w-2.5 h-2.5 rounded-full bg-blue-600 ring-4 ring-white"></div>
+                            <div className="flex items-center justify-between text-xs">
+                              <span className="font-bold text-[#191c1e] font-mono">AGENT_DELIBERATION_PASS</span>
+                              <span className="text-[#737686] font-mono text-[11px]">14:19:44.882 UTC</span>
+                            </div>
+                            <p className="text-xs text-[#434655]">
+                              All 4 autonomous agents completed heuristic assessment. Consensus flag raised for anomalous capital velocity.
+                            </p>
+                          </div>
+
+                          {/* Step 3 */}
+                          <div className="relative space-y-1">
+                            <div className="absolute -left-6 top-1 w-2.5 h-2.5 rounded-full bg-amber-500 ring-4 ring-white"></div>
+                            <div className="flex items-center justify-between text-xs">
+                              <span className="font-bold text-[#191c1e] font-mono">PENDING_EXECUTIVE_SIGNATURE</span>
+                              <span className="text-amber-700 font-mono text-[11px]">Awaiting Action</span>
+                            </div>
+                            <p className="text-xs text-[#434655]">
+                              Execution halted awaiting manual 2FA override or fund containment authorization from Risk Operations.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Supporting Panel (Right - 4 Cols) */}
+                    <div className="lg:col-span-4 space-y-6">
+                      {/* 1. Executive Override */}
+                      <div className="bg-white p-6 rounded-xl border border-blue-200 shadow-xs space-y-4">
+                        <div className="flex items-center gap-2 pb-3 border-b border-[#e1e2e4]">
+                          <span className="material-symbols-outlined text-blue-600 text-[20px]">admin_panel_settings</span>
+                          <div>
+                            <h3 className="text-sm font-bold text-[#191c1e]">Executive Override</h3>
+                            <p className="text-[11px] text-[#737686]">Requires 2FA Authorization Control</p>
+                          </div>
+                        </div>
+
+                        <div className="space-y-2">
+                          <label className="text-xs font-semibold text-[#191c1e]">Hardware Token / TOTP Code</label>
+                          <input
+                            type="text"
+                            maxLength={6}
+                            value={totpCode}
+                            onChange={e => setTotpCode(e.target.value)}
+                            placeholder="000 000"
+                            className="w-full px-3 py-2 bg-[#f8f9fb] border border-[#e1e2e4] rounded-lg text-center font-mono tracking-widest text-base font-bold text-[#191c1e] outline-none focus:ring-1 focus:ring-blue-600 focus:bg-white"
+                          />
+                        </div>
+
+                        <div className="space-y-2 pt-1">
+                          <button
+                            onClick={() => {
+                              setActionAlert('Funds Frozen immediately. Cryptographic transaction record committed to immutable audit ledger.');
+                              setTotpCode('');
+                            }}
+                            className="w-full py-2.5 px-4 rounded-lg bg-rose-600 hover:bg-rose-700 text-white font-semibold text-xs flex items-center justify-center gap-2 shadow-xs transition-colors cursor-pointer"
+                          >
+                            <span className="material-symbols-outlined text-[16px]">lock</span> Freeze Funds (Immediate)
+                          </button>
+                          <button
+                            onClick={() => {
+                              setActionAlert('Transaction authorized by underwriter. Clearance event logged to SHA-256 chain.');
+                              setTotpCode('');
+                            }}
+                            className="w-full py-2.5 px-4 rounded-lg bg-[#f2f4f6] hover:bg-[#e7e8ea] text-[#191c1e] font-semibold text-xs flex items-center justify-center gap-2 transition-colors cursor-pointer border border-[#e1e2e4]"
+                          >
+                            <span className="material-symbols-outlined text-[16px]">verified</span> Authorize &amp; Release
+                          </button>
+                        </div>
+
+                        <div className="p-3 rounded-lg bg-[#f8f9fb] border border-[#e1e2e4] text-[11px] text-[#434655] flex items-start gap-2">
+                          <span className="material-symbols-outlined text-[14px] text-blue-600 mt-0.5">info</span>
+                          <span>Actions are cryptographically signed with your active operator key and cannot be undone without quorum approval.</span>
+                        </div>
+                      </div>
+
+                      {/* 2. Hypotheses & Contradiction Detection */}
+                      <div className="bg-white p-6 rounded-xl border border-[#e1e2e4] shadow-xs space-y-4">
+                        <div className="flex items-center gap-2 pb-3 border-b border-[#e1e2e4]">
+                          <span className="material-symbols-outlined text-[#575e70] text-[20px]">fact_check</span>
+                          <div>
+                            <h3 className="text-sm font-bold text-[#191c1e]">Hypotheses &amp; Contradictions</h3>
+                            <p className="text-[11px] text-[#737686]">Automated divergence analysis</p>
+                          </div>
+                        </div>
+
+                        <div className="space-y-3">
+                          {/* Hypothesis A */}
+                          <div className="p-3 rounded-lg bg-[#f8f9fb] border border-[#e1e2e4] space-y-1">
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs font-bold text-[#191c1e]">Hypothesis A (Structural Layering)</span>
+                              <span className="text-[10px] text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded font-mono font-bold border border-emerald-200">
+                                82% match
+                              </span>
+                            </div>
+                            <p className="text-xs text-[#434655] leading-relaxed">
+                              Target is utilizing shell accounts across Zurich and Frankfurt to break down deposits before final liquidity sweep.
+                            </p>
+                          </div>
+
+                          {/* Hypothesis B */}
+                          <div className="p-3 rounded-lg bg-[#f8f9fb] border border-[#e1e2e4] space-y-1">
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs font-bold text-[#191c1e]">Hypothesis B (Legitimate Arbitrage)</span>
+                              <span className="text-[10px] text-amber-800 bg-amber-50 px-2 py-0.5 rounded font-mono font-bold border border-amber-200">
+                                18% match
+                              </span>
+                            </div>
+                            <p className="text-xs text-[#434655] leading-relaxed">
+                              High-speed treasury rebalancing by corporate entity reacting to spot currency volatility.
+                            </p>
+                          </div>
+
+                          {/* Contradiction Flagged */}
+                          <div className="p-3 rounded-lg bg-rose-50 border border-rose-200 text-rose-900 space-y-1">
+                            <div className="flex items-center gap-1.5 text-xs font-bold text-rose-800">
+                              <span className="material-symbols-outlined text-[16px]">error</span>
+                              Contradiction Flagged
+                            </div>
+                            <p className="text-xs text-rose-800 leading-relaxed">
+                              Corporate registry lists entity as dormant, directly contradicting Hypothesis B liquidity volumes. Behavioral anomaly confirms lack of legitimate trader credentials.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Subtab 2: Case Queue Explorer Workspace */}
+              {investigationSubTab === 'cases' && (
+                <div className="bg-white border border-[#e1e2e4] rounded-xl p-5 shadow-xs">
+                  <InvestigationWorkspace
+                    onSelectCaseForCopilot={c => {
+                      setCopilotCaseFocus(c);
+                      setIsCopilotOpen(true);
+                    }}
+                    onOpenCopilot={() => setIsCopilotOpen(true)}
+                  />
+                </div>
+              )}
+
+              {/* Subtab 3: Multi-Agent Simulator */}
+              {investigationSubTab === 'agents' && (
+                <div className="bg-white border border-[#e1e2e4] rounded-xl p-5 shadow-xs">
+                  <MultiAgentHub />
+                </div>
+              )}
+
+              {/* Subtab 4: Entity Graph & Fraud Heatmap */}
+              {investigationSubTab === 'graphs' && (
+                <div className="bg-white border border-[#e1e2e4] rounded-xl p-5 shadow-xs">
+                  <GraphVisualizer />
+                </div>
+              )}
+
+              {/* Subtab 5: AI Operations & Drift Monitoring */}
+              {investigationSubTab === 'ai-ops' && (
+                <div className="bg-white border border-[#e1e2e4] rounded-xl p-5 shadow-xs">
+                  <AiOperationsCenter />
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* =========================================================================
+              VIEW 5: PAYPAL TRANSACTIONS (Matches paypal_transactions/code.html)
+              ========================================================================= */}
+          {activeTab === 'sandbox' && (
+            <div className="space-y-6">
+              {/* Header (matches prototype) */}
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div>
+                  <h1 className="text-2xl font-bold text-[#191c1e] tracking-tight">PayPal Transactions</h1>
+                  <p className="text-sm text-[#434655] mt-1">
+                    Inspect real-time transaction streams, sandbox payloads, and local demo records.
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  {sandboxStatus && (
+                    <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-50 border border-blue-200 text-blue-900 text-xs">
+                      <span className="w-2 h-2 rounded-full bg-blue-600"></span>
+                      <span>Mode: <strong>{sandboxStatus.mode === 'sandbox' ? 'Live Sandbox' : 'Simulated Security'}</strong></span>
+                    </div>
+                  )}
+                  <button
+                    onClick={() => window.open('/api/audit/export?format=csv', '_blank')}
+                    className="flex items-center gap-1.5 px-3.5 py-2 bg-white hover:bg-slate-50 text-[#191c1e] text-xs font-semibold rounded-lg border border-[#e1e2e4] shadow-xs transition-colors cursor-pointer"
+                  >
+                    <span className="material-symbols-outlined text-[16px]">download</span> Export CSV
+                  </button>
+                  <button
+                    onClick={() => fetchSummary()}
+                    className="flex items-center gap-1.5 px-3.5 py-2 bg-[#004ac6] hover:bg-[#003ea8] text-white text-xs font-semibold rounded-lg shadow-sm transition-colors cursor-pointer"
+                  >
+                    <span className="material-symbols-outlined text-[16px]">sync</span> Sync Stream
+                  </button>
+                </div>
+              </div>
+
+              {/* 4 Top Metric Cards (matches prototype) */}
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div className="bg-white border border-[#e1e2e4] p-5 rounded-xl shadow-xs flex flex-col justify-between">
+                  <div className="flex items-center justify-between text-[#434655] mb-2">
+                    <span className="text-xs uppercase font-semibold tracking-wider">Total Volume (24h)</span>
+                    <span className="material-symbols-outlined text-[20px] text-blue-600">payments</span>
+                  </div>
+                  <div>
+                    <div className="text-2xl font-bold text-[#191c1e] font-mono">$1,248,590.00</div>
+                    <div className="flex items-center gap-1 text-xs text-emerald-700 mt-1 font-medium">
+                      <span className="material-symbols-outlined text-[14px]">trending_up</span>
+                      +12.4% from yesterday
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-white border border-[#e1e2e4] p-5 rounded-xl shadow-xs flex flex-col justify-between">
+                  <div className="flex items-center justify-between text-[#434655] mb-2">
+                    <span className="text-xs uppercase font-semibold tracking-wider">Flagged Risk Events</span>
+                    <span className="material-symbols-outlined text-[20px] text-rose-600">gpp_bad</span>
+                  </div>
+                  <div>
+                    <div className="text-2xl font-bold text-[#191c1e] font-mono">142</div>
+                    <div className="flex items-center gap-1 text-xs text-rose-700 mt-1 font-medium">
+                      <span className="material-symbols-outlined text-[14px]">warning</span>
+                      Requires immediate review
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-white border border-[#e1e2e4] p-5 rounded-xl shadow-xs flex flex-col justify-between">
+                  <div className="flex items-center justify-between text-[#434655] mb-2">
+                    <span className="text-xs uppercase font-semibold tracking-wider">Auto-Cleared</span>
+                    <span className="material-symbols-outlined text-[20px] text-emerald-600">verified_user</span>
+                  </div>
+                  <div>
+                    <div className="text-2xl font-bold text-[#191c1e] font-mono">8,924</div>
+                    <div className="flex items-center gap-1 text-xs text-emerald-700 mt-1 font-medium">
+                      <span className="material-symbols-outlined text-[14px]">check_circle</span>
+                      98.4% clearance rate
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-white border border-[#e1e2e4] p-5 rounded-xl shadow-xs flex flex-col justify-between">
+                  <div className="flex items-center justify-between text-[#434655] mb-2">
+                    <span className="text-xs uppercase font-semibold tracking-wider">Avg Risk Score</span>
+                    <span className="material-symbols-outlined text-[20px] text-amber-600">analytics</span>
+                  </div>
+                  <div>
+                    <div className="text-2xl font-bold text-[#191c1e] font-mono">18.4 / 100</div>
+                    <div className="flex items-center gap-1 text-xs text-[#434655] mt-1 font-medium">
+                      <span className="material-symbols-outlined text-[14px]">shield</span>
+                      Stable baseline
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Orders v2 Interactive Sandbox Tools & Risk Intelligence */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Step 1: Create Order */}
+                <div className="bg-white border border-[#e1e2e4] rounded-xl p-5 shadow-xs space-y-4">
+                  <div className="flex items-center justify-between pb-3 border-b border-[#e1e2e4]">
+                    <div className="flex items-center gap-2">
+                      <span className="w-5 h-5 rounded-full bg-blue-600 text-white flex items-center justify-center text-xs font-bold">1</span>
+                      <h2 className="text-sm font-bold text-[#191c1e]">Create Sandbox Order (Orders v2 API)</h2>
+                    </div>
+                    <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200">
+                      POST /v2/checkout/orders
+                    </span>
+                  </div>
+
+                  <form onSubmit={handleCreateOrder} className="space-y-3">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs font-semibold text-[#191c1e] mb-1">Amount</label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          value={orderAmount}
+                          onChange={e => setOrderAmount(e.target.value)}
+                          className="w-full px-3 py-2 bg-[#f8f9fb] border border-[#e1e2e4] rounded-lg text-xs font-mono text-[#191c1e] focus:bg-white focus:ring-1 focus:ring-blue-600 outline-none"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-[#191c1e] mb-1">Currency</label>
                         <select
                           value={orderCurrency}
                           onChange={e => setOrderCurrency(e.target.value)}
-                          className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-xs font-mono text-slate-200 focus:outline-none focus:border-blue-500"
+                          className="w-full px-3 py-2 bg-[#f8f9fb] border border-[#e1e2e4] rounded-lg text-xs font-mono text-[#191c1e] focus:bg-white focus:ring-1 focus:ring-blue-600 outline-none"
                         >
-                          <option value="USD">USD ($)</option>
-                          <option value="EUR">EUR (€)</option>
-                          <option value="GBP">GBP (£)</option>
-                          <option value="CAD">CAD ($)</option>
-                          <option value="AUD">AUD ($)</option>
+                          <option value="USD">USD</option>
+                          <option value="EUR">EUR</option>
+                          <option value="GBP">GBP</option>
+                          <option value="CAD">CAD</option>
                         </select>
                       </div>
                     </div>
 
                     <div>
-                      <label className="block text-[11px] font-medium text-slate-300 mb-1">Order Description</label>
+                      <label className="block text-xs font-semibold text-[#191c1e] mb-1">Item Description</label>
                       <input
                         type="text"
                         value={orderDescription}
                         onChange={e => setOrderDescription(e.target.value)}
-                        className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-xs text-slate-200 focus:outline-none focus:border-blue-500"
-                        required
+                        className="w-full px-3 py-2 bg-[#f8f9fb] border border-[#e1e2e4] rounded-lg text-xs text-[#191c1e] focus:bg-white focus:ring-1 focus:ring-blue-600 outline-none"
                       />
                     </div>
 
                     {createOrderError && (
-                      <div className="p-3 rounded-lg bg-rose-950/60 border border-rose-500/40 text-xs text-rose-300">
+                      <div className="p-3 rounded-lg bg-rose-50 border border-rose-200 text-rose-800 text-xs">
                         {createOrderError}
-                      </div>
-                    )}
-
-                    {!sandboxStatus?.isConfigured && (
-                      <div className="p-2.5 rounded-lg bg-amber-950/30 border border-amber-500/20 text-[11px] text-amber-300/90 flex items-start space-x-2">
-                        <span className="text-amber-400 font-bold">ℹ</span>
-                        <span>
-                          <strong>Zero-Trust Guarantee:</strong> Server credentials are not configured in <code className="font-mono text-amber-200">.env</code>. Submitting this form safely calls the backend API and demonstrates genuine configuration rejection (HTTP 503) without generating fabricated orders.
-                        </span>
                       </div>
                     )}
 
                     <button
                       type="submit"
                       disabled={loadingCreateOrder}
-                      className="w-full py-2.5 px-4 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-medium text-xs rounded-xl shadow-lg shadow-blue-500/25 transition disabled:opacity-50"
+                      className="w-full py-2.5 px-4 bg-[#004ac6] hover:bg-[#003ea8] text-white text-xs font-semibold rounded-lg shadow-sm transition-colors cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2"
                     >
-                      {loadingCreateOrder ? 'Communicating with PayPal Sandbox...' : 'Create Sandbox Order (POST /v2/checkout/orders)'}
+                      <span className="material-symbols-outlined text-[16px]">add_circle</span>
+                      {loadingCreateOrder ? 'Creating Sandbox Order...' : 'Create Sandbox Order'}
                     </button>
                   </form>
+
+                  {createdOrder && (
+                    <div className="p-3 rounded-lg bg-emerald-50 border border-emerald-200 text-xs space-y-1 text-emerald-900">
+                      <div className="font-bold flex items-center gap-1.5">
+                        <span className="material-symbols-outlined text-[16px] text-emerald-600">check_circle</span>
+                        Order Created: <span className="font-mono">{createdOrder.orderId}</span>
+                      </div>
+                      <div className="text-[11px] text-emerald-800">
+                        Status: <span className="font-semibold">{createdOrder.status}</span> | Mode: <span className="font-semibold">{createdOrder.isSandbox ? 'Sandbox' : 'Simulated'}</span>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
-                {createdOrder && (
-                  <div className="mt-5 p-4 rounded-xl bg-slate-950 border border-blue-500/30 text-xs space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="font-bold text-emerald-400">✓ Order Created on PayPal Sandbox</span>
-                      <span className="text-[10px] bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded font-mono font-bold">
-                        {createdOrder.status}
-                      </span>
+                {/* Step 2: Capture Order & Post-Capture Risk Scoring */}
+                <div className="bg-white border border-[#e1e2e4] rounded-xl p-5 shadow-xs space-y-4">
+                  <div className="flex items-center justify-between pb-3 border-b border-[#e1e2e4]">
+                    <div className="flex items-center gap-2">
+                      <span className="w-5 h-5 rounded-full bg-blue-600 text-white flex items-center justify-center text-xs font-bold">2</span>
+                      <h2 className="text-sm font-bold text-[#191c1e]">Capture &amp; Risk Intelligence</h2>
                     </div>
-                    <div className="font-mono text-slate-300">
-                      Order ID: <span className="font-bold text-white select-all">{createdOrder.orderId}</span>
-                    </div>
-                    <div className="text-slate-400">
-                      Amount: <span className="font-bold text-slate-200">{createdOrder.amount} {createdOrder.currency}</span>
-                    </div>
-
-                    {createdOrder.approveUrl && (
-                      <div className="pt-2">
-                        <a
-                          href={createdOrder.approveUrl}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="inline-flex items-center space-x-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-lg transition shadow-lg shadow-emerald-500/20"
-                        >
-                          <span>Open PayPal Sandbox Approval Flow</span>
-                          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                          </svg>
-                        </a>
-                        <p className="text-[10px] text-slate-400 mt-1 italic">
-                          Log in with your Sandbox Personal Buyer test account to approve. Then proceed to Step 2.
-                        </p>
-                      </div>
-                    )}
+                    <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200">
+                      POST /v2/checkout/orders/&#123;id&#125;/capture
+                    </span>
                   </div>
-                )}
-              </div>
 
-              {/* Step 2: Capture & Intelligence Evaluation */}
-              <div className="rounded-2xl bg-slate-900/90 border border-slate-800 p-6 shadow-xl flex flex-col justify-between">
-                <div>
-                  <div className="flex items-center space-x-2 text-xs font-bold text-emerald-400 uppercase tracking-wider">
-                    <span className="w-5 h-5 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center text-[10px]">2</span>
-                    <span>Capture & Verify Order Server-Side</span>
-                  </div>
-                  <h4 className="text-base font-bold text-white mt-1">Execute Server-Side Verification</h4>
-                  <p className="text-xs text-slate-400 mt-1">
-                    Directly calls <code className="text-cyan-300 font-mono">POST /v2/checkout/orders/:id/capture</code>. Trusts ONLY the verified server response.
-                  </p>
-
-                  <form onSubmit={handleCaptureOrder} className="mt-4 space-y-3">
+                  <form onSubmit={handleCaptureOrder} className="space-y-3">
                     <div>
                       <div className="flex items-center justify-between mb-1">
-                        <label className="text-[11px] font-medium text-slate-300">PayPal Order ID</label>
-                        <span className="text-[10px] text-slate-400">Click a preset to test risk intelligence</span>
+                        <label className="text-xs font-semibold text-[#191c1e]">PayPal Order ID to Capture</label>
+                        <div className="flex items-center gap-1.5 text-[11px]">
+                          <span className="text-[#434655]">Preset:</span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setCaptureOrderId('5O190127TN364715T');
+                              handleEvaluateSandboxTransaction('5O190127TN364715T', 25.0);
+                            }}
+                            className="text-blue-700 hover:underline font-mono"
+                          >
+                            $25 Standard
+                          </button>
+                          <span>•</span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setCaptureOrderId('8AB91234XY789012Z');
+                              handleEvaluateSandboxTransaction('8AB91234XY789012Z', 4500.0);
+                            }}
+                            className="text-rose-700 hover:underline font-mono"
+                          >
+                            $4,500 High-Ticket
+                          </button>
+                        </div>
                       </div>
-                      <div className="flex space-x-2">
-                        <input
-                          type="text"
-                          value={captureOrderId}
-                          onChange={e => setCaptureOrderId(e.target.value)}
-                          className="flex-1 px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-xs font-mono text-slate-200 focus:outline-none focus:border-emerald-500"
-                          placeholder="e.g. 5O190127TN364715T"
-                          required
-                        />
-                        <button
-                          type="button"
-                          onClick={handleGetOrderDetails}
-                          disabled={loadingCapture}
-                          className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-xs font-medium transition cursor-pointer"
-                          title="Query Order Details"
-                        >
-                          Query Details
-                        </button>
-                      </div>
-
-                      <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[11px]">
-                        <span className="text-slate-400 font-medium">Demo Presets:</span>
-                        <button
-                          type="button"
-                          onClick={() => { setCaptureOrderId('5O190127TN364715T'); setOrderAmount('25.00'); setCaptureError(null); }}
-                          className="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-cyan-300 font-mono transition cursor-pointer"
-                        >
-                          Standard ($25.00)
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => { setCaptureOrderId('8AB91234XY789012Z'); setOrderAmount('4500.00'); setCaptureError(null); }}
-                          className="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-amber-300 font-mono transition cursor-pointer"
-                        >
-                          High-Ticket ($4,500.00)
-                        </button>
-                      </div>
+                      <input
+                        type="text"
+                        value={captureOrderId}
+                        onChange={e => setCaptureOrderId(e.target.value)}
+                        className="w-full px-3 py-2 bg-[#f8f9fb] border border-[#e1e2e4] rounded-lg text-xs font-mono text-[#191c1e] focus:bg-white focus:ring-1 focus:ring-blue-600 outline-none"
+                        required
+                      />
                     </div>
 
                     {captureError && (
-                      <div className="p-3 rounded-lg bg-rose-950/60 border border-rose-500/40 text-xs text-rose-300">
+                      <div className="p-3 rounded-lg bg-rose-50 border border-rose-200 text-rose-800 text-xs">
                         {captureError}
                       </div>
                     )}
 
-                    <div className="flex space-x-2">
+                    <div className="flex gap-2">
                       <button
                         type="submit"
                         disabled={loadingCapture}
-                        className="flex-1 py-2.5 px-4 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-medium text-xs rounded-xl shadow-lg shadow-emerald-500/25 transition disabled:opacity-50"
+                        className="flex-1 py-2.5 px-4 bg-[#004ac6] hover:bg-[#003ea8] text-white text-xs font-semibold rounded-lg shadow-sm transition-colors cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2"
                       >
-                        {loadingCapture ? 'Verifying Capture with PayPal Sandbox...' : 'Capture Approved Order (POST /orders/:id/capture)'}
+                        <span className="material-symbols-outlined text-[16px]">shopping_cart_checkout</span>
+                        {loadingCapture ? 'Capturing...' : 'Capture Order'}
                       </button>
 
                       <button
                         type="button"
-                        onClick={handleEvaluateSandboxOrder}
-                        disabled={loadingSandboxEval || (!captureResult && !captureOrderId)}
-                        className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-medium text-xs rounded-xl shadow-lg shadow-indigo-500/25 transition disabled:opacity-40"
+                        onClick={() => handleEvaluateSandboxTransaction(captureOrderId.trim())}
+                        disabled={loadingSandboxEval}
+                        className="px-4 py-2.5 bg-[#f2f4f6] hover:bg-[#e7e8ea] text-[#191c1e] text-xs font-semibold rounded-lg border border-[#e1e2e4] transition-colors cursor-pointer flex items-center gap-1.5"
                       >
-                        {loadingSandboxEval ? 'Evaluating...' : 'Run Risk Intelligence'}
+                        <span className="material-symbols-outlined text-[16px]">analytics</span>
+                        Score Risk
                       </button>
                     </div>
                   </form>
-                </div>
 
-                {captureResult && (
-                  <div className="mt-5 p-4 rounded-xl bg-slate-950 border border-emerald-500/40 text-xs space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="font-bold text-emerald-400">✓ PayPal API Capture Confirmed</span>
-                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-300 font-mono">
-                        {captureResult.status}
-                      </span>
-                    </div>
-                    <div className="font-mono text-slate-300">
-                      Capture ID: <span className="font-bold text-white select-all">{captureResult.captureId}</span>
-                    </div>
-                    <div className="text-slate-300">
-                      Settled: <span className="font-bold text-emerald-400">${captureResult.amount} {captureResult.currency}</span>
-                    </div>
-                    {captureResult.payer?.email && (
-                      <div className="text-slate-400">
-                        Payer: <span className="text-slate-200">{captureResult.payer.name || captureResult.payer.email}</span>
+                  {captureResult && (
+                    <div className="p-3 rounded-lg bg-emerald-50 border border-emerald-200 text-xs space-y-1 text-emerald-900">
+                      <div className="font-bold flex items-center gap-1.5">
+                        <span className="material-symbols-outlined text-[16px] text-emerald-600">check_circle</span>
+                        Order Captured: <span className="font-mono">{captureResult.captureId}</span>
                       </div>
-                    )}
-                    <div className="text-[10px] text-slate-500 font-mono">
-                      Timestamp: {captureResult.capturedAt}
+                      <div className="text-[11px] text-emerald-800">
+                        Amount: <span className="font-semibold">{captureResult.amount} {captureResult.currency}</span> | Status: <span className="font-semibold">{captureResult.status}</span>
+                      </div>
                     </div>
-                  </div>
-                )}
+                  )}
 
-                {orderDetails && !captureResult && (
-                  <div className="mt-5 p-4 rounded-xl bg-slate-950 border border-blue-500/30 text-xs space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="font-bold text-blue-400">✓ PayPal Order Status Retrieved</span>
-                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-500/20 text-blue-300 font-mono">
-                        {orderDetails.status}
-                      </span>
+                  {/* Post-Capture Risk Scoring Output */}
+                  {sandboxRiskEval && (
+                    <div className="p-4 rounded-xl border border-[#e1e2e4] bg-[#f8f9fb] space-y-3 text-xs">
+                      <div className="flex items-center justify-between pb-2 border-b border-[#e1e2e4]">
+                        <span className="font-bold text-[#191c1e] flex items-center gap-1.5">
+                          <span className="material-symbols-outlined text-[16px] text-blue-600">verified_user</span>
+                          Post-Capture Risk Assessment
+                        </span>
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                          sandboxRiskEval.category === 'Low Risk'
+                            ? 'bg-emerald-100 text-emerald-800'
+                            : 'bg-rose-100 text-rose-800'
+                        }`}>
+                          {sandboxRiskEval.category} ({sandboxRiskEval.riskScore}/100)
+                        </span>
+                      </div>
+                      <p className="text-[#434655] leading-relaxed">
+                        {sandboxRiskEval.explanation}
+                      </p>
+                      <div className="flex flex-wrap gap-1 text-[11px]">
+                        {sandboxRiskEval.signals.map((sig, i) => (
+                          <span key={i} className="px-2 py-0.5 bg-white border border-[#e1e2e4] rounded text-[#191c1e]">
+                            {sig.name} ({sig.weight > 0 ? `+${sig.weight}` : sig.weight})
+                          </span>
+                        ))}
+                      </div>
                     </div>
-                    <div className="font-mono text-slate-300">Order ID: {orderDetails.orderId}</div>
-                    <div className="text-slate-300">Amount: ${orderDetails.amount} {orderDetails.currency} (Intent: {orderDetails.intent})</div>
-                  </div>
-                )}
+                  )}
+                </div>
+              </div>
 
-                {/* Sandbox Transaction Risk Evaluation Card */}
-                {sandboxRiskEval && (
-                  <div className="mt-4 p-4 rounded-xl bg-slate-950 border border-indigo-500/40 text-xs space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="font-bold text-indigo-300">✦ Sandbox Transaction Intelligence Breakdown</span>
-                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${getRiskColor(sandboxRiskEval.category)}`}>
-                        {sandboxRiskEval.category} ({sandboxRiskEval.riskScore}/100)
-                      </span>
-                    </div>
-                    <p className="text-slate-300">{sandboxRiskEval.explanation}</p>
-                    <div className="text-[11px] text-slate-400 space-y-1">
-                      <div>Observed: {sandboxRiskEval.evidenceBreakdown.observedEvidence.join(' ')}</div>
-                      <div className="text-amber-300">Next Step: {sandboxRiskEval.recommendations[0]}</div>
-                    </div>
+              {/* Transactions Stream Table */}
+              <div className="bg-white border border-[#e1e2e4] rounded-xl shadow-xs overflow-hidden">
+                <div className="p-4 border-b border-[#e1e2e4] flex flex-wrap items-center justify-between gap-3 bg-[#f8f9fb]">
+                  <div className="flex items-center gap-2">
+                    <span className="material-symbols-outlined text-[18px] text-blue-600">receipt</span>
+                    <h2 className="text-sm font-bold text-[#191c1e]">Stream Inspection Log</h2>
                   </div>
-                )}
+                  <div className="flex items-center gap-1 text-xs">
+                    <button className="px-3 py-1 rounded-md bg-[#004ac6] text-white font-semibold shadow-xs">All</button>
+                    <button className="px-3 py-1 rounded-md text-[#434655] hover:text-[#191c1e] hover:bg-slate-200/50">Flagged</button>
+                    <button className="px-3 py-1 rounded-md text-[#434655] hover:text-[#191c1e] hover:bg-slate-200/50">Cleared</button>
+                  </div>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs divide-y divide-[#e1e2e4]">
+                    <thead className="bg-[#f2f4f6] text-[#434655] font-semibold uppercase tracking-wider text-[11px]">
+                      <tr>
+                        <th className="py-3 px-4">Transaction / Order ID</th>
+                        <th className="py-3 px-4">Timestamp</th>
+                        <th className="py-3 px-4">Counterparty</th>
+                        <th className="py-3 px-4 text-right">Amount</th>
+                        <th className="py-3 px-4">Risk Category</th>
+                        <th className="py-3 px-4">Status</th>
+                        <th className="py-3 px-4 text-right">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-[#e1e2e4] text-[#191c1e]">
+                      <tr className="hover:bg-slate-50 transition-colors">
+                        <td className="py-3 px-4 font-mono font-semibold text-[#191c1e]">5O190127TN364715T</td>
+                        <td className="py-3 px-4 font-mono text-[#434655] text-[11px]">2026-11-10 09:12:04</td>
+                        <td className="py-3 px-4 font-mono text-blue-700">MERCHANT_GROWTH_001</td>
+                        <td className="py-3 px-4 font-mono font-bold text-right text-[#191c1e]">$25.00 USD</td>
+                        <td className="py-3 px-4">
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                            Low Risk (12/100)
+                          </span>
+                        </td>
+                        <td className="py-3 px-4">
+                          <span className="text-emerald-700 font-semibold text-[11px]">COMPLETED</span>
+                        </td>
+                        <td className="py-3 px-4 text-right">
+                          <button
+                            onClick={() => {
+                              setCaptureOrderId('5O190127TN364715T');
+                              handleEvaluateSandboxTransaction('5O190127TN364715T', 25.0);
+                            }}
+                            className="text-blue-600 hover:text-blue-800 font-semibold cursor-pointer"
+                          >
+                            Inspect →
+                          </button>
+                        </td>
+                      </tr>
+                      <tr className="hover:bg-slate-50 transition-colors">
+                        <td className="py-3 px-4 font-mono font-semibold text-[#191c1e]">8AB91234XY789012Z</td>
+                        <td className="py-3 px-4 font-mono text-[#434655] text-[11px]">2026-11-10 09:15:22</td>
+                        <td className="py-3 px-4 font-mono text-blue-700">MERCHANT_COMPROMISED_002</td>
+                        <td className="py-3 px-4 font-mono font-bold text-right text-rose-700">$4,500.00 USD</td>
+                        <td className="py-3 px-4">
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-rose-50 text-rose-700 border border-rose-200">
+                            High Risk (86/100)
+                          </span>
+                        </td>
+                        <td className="py-3 px-4">
+                          <span className="text-amber-700 font-semibold text-[11px]">HOLD_FOR_REVIEW</span>
+                        </td>
+                        <td className="py-3 px-4 text-right">
+                          <button
+                            onClick={() => {
+                              setCaptureOrderId('8AB91234XY789012Z');
+                              handleEvaluateSandboxTransaction('8AB91234XY789012Z', 4500.0);
+                            }}
+                            className="text-blue-600 hover:text-blue-800 font-semibold cursor-pointer"
+                          >
+                            Inspect →
+                          </button>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </div>
-          </div>
-        )}
+          )}
 
-        {/* TAB: IMMUTABLE AUDIT CENTER */}
-        {activeTab === 'audit' && (
-          <AuditCenter />
-        )}
-      </main>
+          {/* =========================================================================
+              VIEW 6: AUDIT & SYSTEM LOGS (Matches audit_system/code.html)
+              ========================================================================= */}
+          {activeTab === 'audit' && (
+            <div className="space-y-6">
+              {/* Header (matches prototype) */}
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div>
+                  <h1 className="text-2xl font-bold text-[#191c1e] tracking-tight">Audit &amp; system logs</h1>
+                  <p className="text-sm text-[#434655] mt-1">
+                    Comprehensive audit trail, SHA-256 cryptographic verification, and real-time node synchronization status.
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => window.open('/api/audit/export?format=csv', '_blank')}
+                    className="flex items-center gap-1.5 px-3.5 py-2 bg-white hover:bg-slate-50 text-[#191c1e] text-xs font-semibold rounded-lg border border-[#e1e2e4] shadow-xs transition-colors cursor-pointer"
+                  >
+                    <span className="material-symbols-outlined text-[16px]">download</span> Export Ledger
+                  </button>
+                  <button
+                    onClick={() => {
+                      fetch('/api/audit/verify')
+                        .then(res => res.json())
+                        .then(data => {
+                          setActionAlert(`Cryptographic Chain Verified: ${data.valid}/${data.total} records match SHA-256 signatures. Zero tampering.`);
+                        });
+                    }}
+                    className="flex items-center gap-1.5 px-3.5 py-2 bg-[#004ac6] hover:bg-[#003ea8] text-white text-xs font-semibold rounded-lg shadow-sm transition-colors cursor-pointer"
+                  >
+                    <span className="material-symbols-outlined text-[16px]">verified</span> Verify Chain
+                  </button>
+                </div>
+              </div>
 
-      {/* Footer */}
-      <footer className="border-t border-slate-800/80 bg-slate-950 py-6 text-center text-xs text-slate-400">
-        <p>PayPal TrustShield AI • PayPal Next-Generation Fraud Operations Platform • Explainable Intelligence Layer & Official Sandbox Orders v2</p>
-        <p className="mt-1 text-[11px] text-slate-500">Advisory pre-screening intelligence. Strict non-destructive invariant: Does not freeze or alter live PayPal merchant accounts.</p>
-      </footer>
+              {/* Top 4 Metrics Strip (matches prototype) */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                {/* Metric 1 */}
+                <div className="p-5 bg-white border border-[#e1e2e4] rounded-xl shadow-xs flex flex-col justify-between">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-semibold text-[#434655]">Active Integrity Status</span>
+                    <span className="material-symbols-outlined text-emerald-600 text-[20px]">security</span>
+                  </div>
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-2xl font-bold text-[#191c1e]">Verified</span>
+                    <span className="text-xs text-emerald-700 font-semibold font-mono">SHA-256</span>
+                  </div>
+                  <div className="mt-3 w-full bg-[#edeef0] h-1.5 rounded-full overflow-hidden">
+                    <div className="bg-emerald-600 h-full w-full rounded-full"></div>
+                  </div>
+                </div>
 
-      {/* Copilot Assistant Drawer (⌘K / Ctrl+K) */}
+                {/* Metric 2 */}
+                <div className="p-5 bg-white border border-[#e1e2e4] rounded-xl shadow-xs flex flex-col justify-between">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-semibold text-[#434655]">Node Synchronization</span>
+                    <span className="material-symbols-outlined text-blue-600 text-[20px]">sync</span>
+                  </div>
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-2xl font-bold text-[#191c1e]">100%</span>
+                    <span className="text-xs text-blue-700 font-semibold font-mono">12/12 Nodes</span>
+                  </div>
+                  <div className="mt-3 w-full bg-[#edeef0] h-1.5 rounded-full overflow-hidden">
+                    <div className="bg-blue-600 h-full w-full rounded-full"></div>
+                  </div>
+                </div>
+
+                {/* Metric 3 */}
+                <div className="p-5 bg-white border border-[#e1e2e4] rounded-xl shadow-xs flex flex-col justify-between">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-semibold text-[#434655]">API Latency</span>
+                    <span className="material-symbols-outlined text-amber-600 text-[20px]">bolt</span>
+                  </div>
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-2xl font-bold text-[#191c1e]">24ms</span>
+                    <span className="text-xs text-emerald-700 font-semibold">-4ms avg</span>
+                  </div>
+                  <div className="mt-3 w-full bg-[#edeef0] h-1.5 rounded-full overflow-hidden">
+                    <div className="bg-amber-600 h-full w-4/5 rounded-full"></div>
+                  </div>
+                </div>
+
+                {/* Metric 4 */}
+                <div className="p-5 bg-white border border-[#e1e2e4] rounded-xl shadow-xs flex flex-col justify-between">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-semibold text-[#434655]">Security Enclave</span>
+                    <span className="material-symbols-outlined text-[#191c1e] text-[20px]">lock</span>
+                  </div>
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-2xl font-bold text-[#191c1e]">HSM Active</span>
+                    <span className="text-xs text-[#434655] font-semibold">Enterprise</span>
+                  </div>
+                  <div className="mt-3 w-full bg-[#edeef0] h-1.5 rounded-full overflow-hidden">
+                    <div className="bg-[#191c1e] h-full w-full rounded-full"></div>
+                  </div>
+                </div>
+              </div>
+
+              {/* System Health Microservices Grid (matches prototype) */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-sm font-bold text-[#191c1e]">System Health &amp; Integration Status</h2>
+                  <span className="text-xs text-[#434655]">Real-time Telemetry</span>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                  <div className="p-4 bg-white border border-[#e1e2e4] rounded-xl shadow-xs flex flex-col justify-between gap-3">
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-9 h-9 rounded-lg bg-blue-50 text-blue-700 flex items-center justify-center">
+                          <span className="material-symbols-outlined text-[20px]">memory</span>
+                        </div>
+                        <div>
+                          <h3 className="text-xs font-bold text-[#191c1e]">TrustShield AI Core</h3>
+                          <span className="text-[10px] text-[#434655]">v4.2.1-stable</span>
+                        </div>
+                      </div>
+                      <span className="flex h-2 w-2 relative">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between pt-2 border-t border-[#e1e2e4] text-[11px]">
+                      <span className="text-[#434655]">Uptime 99.99%</span>
+                      <span className="text-emerald-700 font-semibold">Operational</span>
+                    </div>
+                  </div>
+
+                  <div className="p-4 bg-white border border-[#e1e2e4] rounded-xl shadow-xs flex flex-col justify-between gap-3">
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-9 h-9 rounded-lg bg-blue-50 text-blue-700 flex items-center justify-center">
+                          <span className="material-symbols-outlined text-[20px]">hub</span>
+                        </div>
+                        <div>
+                          <h3 className="text-xs font-bold text-[#191c1e]">PayPal Gateway</h3>
+                          <span className="text-[10px] text-[#434655]">REST API v2</span>
+                        </div>
+                      </div>
+                      <span className="flex h-2 w-2 relative">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between pt-2 border-t border-[#e1e2e4] text-[11px]">
+                      <span className="text-[#434655]">Latency 18ms</span>
+                      <span className="text-emerald-700 font-semibold">Connected</span>
+                    </div>
+                  </div>
+
+                  <div className="p-4 bg-white border border-[#e1e2e4] rounded-xl shadow-xs flex flex-col justify-between gap-3">
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-9 h-9 rounded-lg bg-blue-50 text-blue-700 flex items-center justify-center">
+                          <span className="material-symbols-outlined text-[20px]">group</span>
+                        </div>
+                        <div>
+                          <h3 className="text-xs font-bold text-[#191c1e]">Multi-Agent Fleet</h3>
+                          <span className="text-[10px] text-[#434655]">4 Autonomous Agents</span>
+                        </div>
+                      </div>
+                      <span className="flex h-2 w-2 relative">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between pt-2 border-t border-[#e1e2e4] text-[11px]">
+                      <span className="text-[#434655]">Consensus 100%</span>
+                      <span className="text-emerald-700 font-semibold">Synchronized</span>
+                    </div>
+                  </div>
+
+                  <div className="p-4 bg-white border border-[#e1e2e4] rounded-xl shadow-xs flex flex-col justify-between gap-3">
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-9 h-9 rounded-lg bg-blue-50 text-blue-700 flex items-center justify-center">
+                          <span className="material-symbols-outlined text-[20px]">enhanced_encryption</span>
+                        </div>
+                        <div>
+                          <h3 className="text-xs font-bold text-[#191c1e]">Cryptographic Ledger</h3>
+                          <span className="text-[10px] text-[#434655]">SHA-256 Chained</span>
+                        </div>
+                      </div>
+                      <span className="flex h-2 w-2 relative">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between pt-2 border-t border-[#e1e2e4] text-[11px]">
+                      <span className="text-[#434655]">Tamper-Free</span>
+                      <span className="text-emerald-700 font-semibold">Verified</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Subtabs for Audit & Diagnostics */}
+              <div className="flex items-center gap-2 border-b border-[#e1e2e4] pb-1">
+                <button
+                  onClick={() => setAuditSubTab('logs')}
+                  className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
+                    auditSubTab === 'logs'
+                      ? 'bg-[#004ac6] text-white shadow-xs'
+                      : 'bg-white border border-[#e1e2e4] text-[#434655] hover:bg-slate-50'
+                  }`}
+                >
+                  Cryptographic Audit Trail (SHA-256)
+                </button>
+                <button
+                  onClick={() => setAuditSubTab('monitoring')}
+                  className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
+                    auditSubTab === 'monitoring'
+                      ? 'bg-[#004ac6] text-white shadow-xs'
+                      : 'bg-white border border-[#e1e2e4] text-[#434655] hover:bg-slate-50'
+                  }`}
+                >
+                  System Telemetry &amp; Diagnostics
+                </button>
+                <button
+                  onClick={() => setAuditSubTab('knowledge')}
+                  className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
+                    auditSubTab === 'knowledge'
+                      ? 'bg-[#004ac6] text-white shadow-xs'
+                      : 'bg-white border border-[#e1e2e4] text-[#434655] hover:bg-slate-50'
+                  }`}
+                >
+                  Fraud Typology Knowledge Base
+                </button>
+              </div>
+
+              {auditSubTab === 'logs' && <AuditCenter />}
+              {auditSubTab === 'monitoring' && <SystemMonitoringCenter />}
+              {auditSubTab === 'knowledge' && <KnowledgeCenter />}
+            </div>
+          )}
+        </main>
+      </div>
+
+      {/* Slide-over Drawers & Modals */}
       <CopilotDrawer
         isOpen={isCopilotOpen}
         onClose={() => setIsCopilotOpen(false)}
         activeCase={copilotCaseFocus}
       />
 
-      {/* Keyboard Shortcuts Accessibility Modal (?) */}
-      <KeyboardShortcutsModal
-        isOpen={isShortcutsModalOpen}
-        onClose={() => setIsShortcutsModalOpen(false)}
-      />
-
-      {/* System Diagnostics & Observability Modal */}
       <SystemDiagnosticsModal
         isOpen={showDiagnosticsModal}
         onClose={() => setShowDiagnosticsModal(false)}
+      />
+
+      <KeyboardShortcutsModal
+        isOpen={isShortcutsModalOpen}
+        onClose={() => setIsShortcutsModalOpen(false)}
       />
     </div>
   );

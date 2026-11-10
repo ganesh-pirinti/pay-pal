@@ -92,6 +92,30 @@ class AuditLogStore {
     });
     return [header, ...rows].join('\n');
   }
+
+  public verifyChecksum(entry: AuditLogEntry): boolean {
+    const payload = `${entry.id}|${entry.timestamp}|${entry.eventType}|${entry.userId}|${entry.details}`;
+    const expected = createHash('sha256').update(payload).digest('hex').substring(0, 16);
+    return entry.checksum === expected;
+  }
+
+  public verifyIntegrity(): { total: number; valid: number; invalid: string[]; isTamperFree: boolean } {
+    const invalid: string[] = [];
+    let valid = 0;
+    for (const log of this.logs) {
+      if (this.verifyChecksum(log)) {
+        valid += 1;
+      } else {
+        invalid.push(log.id);
+      }
+    }
+    return {
+      total: this.logs.length,
+      valid,
+      invalid,
+      isTamperFree: invalid.length === 0
+    };
+  }
 }
 
 export const auditLogger = new AuditLogStore();

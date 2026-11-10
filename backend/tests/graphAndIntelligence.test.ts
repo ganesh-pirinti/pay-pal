@@ -63,6 +63,15 @@ describe('Graph Visualizations, Knowledge Base, Audit & Monitoring Tests', () =>
       expect(res.text).toContain('checksum');
       expect(res.text).toContain('eventType');
     });
+
+    it('GET /api/audit/verify: Cryptographically verifies SHA-256 integrity and detects altered records', async () => {
+      const res = await request(app).get('/api/audit/verify');
+      expect(res.status).toBe(200);
+      expect(res.body.isTamperFree).toBe(true);
+      expect(res.body.valid).toBe(res.body.total);
+      expect(res.body.invalid.length).toBe(0);
+      expect(res.body.algorithm).toBe('SHA-256');
+    });
   });
 
   describe('4. Fraud Intelligence Endpoints', () => {
