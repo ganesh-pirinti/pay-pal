@@ -2,45 +2,114 @@ name: PayPal TrustShield AI — Continuous Integration & Security Pipeline
 
 on:
   push:
-    branches: [ main, master, develop ]
+    branches: [ main, master, develop, release/** ]
   pull_request:
     branches: [ main, master ]
 
+permissions:
+  contents: read
+
 jobs:
-  test-and-verify:
-    name: Build, Lint, Security Audit & Automated Test Verification
+  lint-and-security:
+    name: Code Quality & Security Audit
     runs-on: ubuntu-latest
-
-    strategy:
-      matrix:
-        node-version: [ 20.x, 22.x ]
-
     steps:
       - name: Checkout Code Repository
         uses: actions/checkout@v4
 
-      - name: Set up Node.js ${{ matrix.node-version }}
+      - name: Set up Node.js 22.x LTS
         uses: actions/setup-node@v4
         with:
-          node-version: ${{ matrix.node-version }}
+          node-version: 22.x
           cache: 'npm'
 
       - name: Install Workspace Dependencies
         run: npm ci
 
-      - name: TypeScript Compilation & Production Build
-        run: npm run build
+      - name: Run Fast Linter (Oxlint)
+        run: npm run lint
 
-      - name: Static Security Scan (Zero Client-Side Secret Leak Audit)
+      - name: Static Security Scan (Zero Leaked Credentials Audit)
         run: |
-          echo "Scanning frontend distribution bundles for leaked credentials..."
-          ! grep -rn "PAYPAL_CLIENT_SECRET" frontend/src/ || exit 1
-          ! grep -rn "sk_live_" frontend/src/ || exit 1
+          echo "Scanning frontend source files for leaked credentials or secrets..."
+          ! grep -rn "PAYPAL_CLIENT_SECRET" frontend/src/ || (echo "FAILED: Leaked PAYPAL_CLIENT_SECRET in frontend/src!" && exit 1)
+          ! grep -rn "sk_live_" frontend/src/ || (echo "FAILED: Leaked sk_live_ in frontend/src!" && exit 1)
+          ! grep -rn "BEGIN PRIVATE KEY" frontend/src/ || (echo "FAILED: Leaked private key in frontend/src!" && exit 1)
           echo "Security Scan Passed: 0 client-side credentials detected."
 
-      - name: Execute Vitest Automated Test Suites (100 Tests)
+  build:
+    name: TypeScript Compilation & Production Build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 22.x LTS
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
+          cache: 'npm'
+
+      - name: Install Workspace Dependencies
+        run: npm ci
+
+      - name: Production Build (Frontend & Backend)
+        run: npm run build
+
+      - name: Verify Build Artifacts
+        run: |
+          test -f frontend/dist/index.html || (echo "FAILED: frontend/dist/index.html missing" && exit 1)
+          test -f backend/dist/backend/src/server.js || (echo "FAILED: backend/dist/backend/src/server.js missing" && exit 1)
+          echo "Production build verification succeeded."
+
+  test:
+    name: Vitest Automated Test Suites (101 Tests)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 22.x LTS
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
+          cache: 'npm'
+
+      - name: Install Workspace Dependencies
+        run: npm ci
+
+      - name: Execute Vitest Automated Test Suites
         run: npm test
 
+  docker:
+    name: Docker Container Build Verification
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code Repository
+        uses: actions/checkout@v4
+
       - name: Verify Docker Container Build
+        run: docker build -t paypal-trustshield-ai:test .
+
+  ci-gate:
+    name: CI Pipeline Verification Gate
+    runs-on: ubuntu-latest
+    needs: [lint-and-security, build, test, docker]
+    if: always()
+    steps:
+      - name: Evaluate Pipeline Results
         run: |
-          docker build -t paypal-trustshield-ai:test .
+          echo "Evaluating CI Pipeline execution..."
+          echo "  - lint-and-security: ${{ needs.lint-and-security.result }}"
+          echo "  - build:             ${{ needs.build.result }}"
+          echo "  - test:              ${{ needs.test.result }}"
+          echo "  - docker:            ${{ needs.docker.result }}"
+          
+          if [ "${{ needs.lint-and-security.result }}" != "success" ] || \
+             [ "${{ needs.build.result }}" != "success" ] || \
+             [ "${{ needs.test.result }}" != "success" ] || \
+             [ "${{ needs.docker.result }}" != "success" ]; then
+            echo "CI Gate FAILED: One or more required pipeline stages failed or were cancelled."
+            exit 1
+          fi
+          echo "CI Gate PASSED: All verification stages executed successfully."

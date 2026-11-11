@@ -3,6 +3,9 @@
   "version": "0.1.0",
   "main": "dist/backend/src/server.js",
   "type": "module",
+  "engines": {
+    "node": ">=22.12.0"
+  },
   "scripts": {
     "dev": "tsc && node dist/backend/src/server.js",
     "build": "tsc",
