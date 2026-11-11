@@ -514,7 +514,7 @@ export const MultiAgentHub: React.FC<MultiAgentHubProps> = () => {
                   type="text"
                   value={formData.sandboxOrderId}
                   onChange={e => setFormData({ ...formData, sandboxOrderId: e.target.value })}
-                  placeholder="e.g. 5O190127TN364715T"
+                  placeholder="e.g. 8G12345678901234A (from Step 1)"
                   className="w-full mt-1 px-3 py-2 rounded-lg bg-slate-950 border border-slate-800 text-slate-200 font-mono focus:outline-none focus:border-blue-500"
                 />
               </div>

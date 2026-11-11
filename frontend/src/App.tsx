@@ -248,7 +248,7 @@ export default function App() {
   const [loadingCreateOrder, setLoadingCreateOrder] = useState(false);
   const [createOrderError, setCreateOrderError] = useState<string | null>(null);
 
-  const [captureOrderId, setCaptureOrderId] = useState('5O190127TN364715T');
+  const [captureOrderId, setCaptureOrderId] = useState('');
   const [captureResult, setCaptureResult] = useState<CaptureOrderResult | null>(null);
   const [loadingCapture, setLoadingCapture] = useState(false);
   const [captureError, setCaptureError] = useState<string | null>(null);
@@ -338,7 +338,7 @@ export default function App() {
     setInvoiceError(null);
     setCreatedOrder(null);
     setCaptureResult(null);
-    setCaptureOrderId('5O190127TN364715T');
+    setCaptureOrderId('');
     setSandboxRiskEval(null);
     setOrderAmount('25.00');
     setOrderDescription('TrustShield AI Sandbox Security Test');
@@ -523,24 +523,55 @@ export default function App() {
     setCaptureResult(null);
     setSandboxRiskEval(null);
 
-    try {
-      if (!captureOrderId.trim()) {
-        setCaptureError('Please enter a PayPal Order ID.');
-        setLoadingCapture(false);
-        return;
-      }
+    const trimmedId = captureOrderId.trim();
+    if (!trimmedId) {
+      setCaptureError('Please provide a genuine PayPal Order ID from Step 1 or enter an active Sandbox Order ID.');
+      setLoadingCapture(false);
+      return;
+    }
 
-      const res = await fetch(`/api/paypal/orders/${encodeURIComponent(captureOrderId.trim())}/capture`, {
+    // Defensive check: Guard against illustrative mock sample IDs in real capture execution
+    const ILLUSTRATIVE_SAMPLE_IDS = ['5O190127TN364715T', '50190127TN364715T', '8AB91234XY789012Z'];
+    if (ILLUSTRATIVE_SAMPLE_IDS.includes(trimmedId.toUpperCase())) {
+      setCaptureError(`"${trimmedId}" is an illustrative mock telemetry sample, not an executable PayPal order. Real capture requires an active order created in Step 1 or an active Sandbox order ID.`);
+      setLoadingCapture(false);
+      return;
+    }
+
+    // Defensive check: Prevent accidental duplicate capture attempts
+    if (captureResult && captureResult.orderId === trimmedId && (captureResult.status === 'COMPLETED' || captureResult.status === 'SUCCESS')) {
+      setCaptureError(`Order ${trimmedId} has already been successfully captured. Accidental duplicate capture blocked.`);
+      setLoadingCapture(false);
+      return;
+    }
+
+    // Validate standard PayPal Order ID alphanumeric format (8-64 chars)
+    if (!/^[A-Z0-9_-]{8,64}$/i.test(trimmedId)) {
+      setCaptureError('Invalid PayPal Order ID format. Expected 8–64 alphanumeric characters.');
+      setLoadingCapture(false);
+      return;
+    }
+
+    try {
+      const res = await fetch(`/api/paypal/orders/${encodeURIComponent(trimmedId)}/capture`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' }
       });
 
       const data = await res.json();
       if (!res.ok) {
-        setCaptureError(data.message || data.error || 'Failed to capture sandbox order.');
+        if (res.status === 503) {
+          setCaptureError(data.message || 'PayPal Sandbox API credentials are not configured in backend/.env. Operating in zero-trust simulated mode.');
+        } else if (res.status === 422) {
+          setCaptureError(data.message || 'PayPal reported this order is unapproved, expired, or already captured.');
+        } else if (res.status === 404) {
+          setCaptureError(data.message || `Order ${trimmedId} was not found in PayPal Sandbox.`);
+        } else {
+          setCaptureError(data.message || data.error || `Failed to capture sandbox order (HTTP ${res.status}).`);
+        }
       } else {
         setCaptureResult(data);
-        handleEvaluateSandboxTransaction(captureOrderId.trim());
+        handleEvaluateSandboxTransaction(trimmedId);
       }
     } catch (err: unknown) {
       setCaptureError(err instanceof Error ? err.message : 'Network error capturing sandbox order.');
@@ -1808,7 +1839,7 @@ export default function App() {
                             <div className="flex items-center gap-3 text-[11px] text-[#737686] pt-1 font-mono">
                               <span>Jurisdiction: EU-DE</span>
                               <span>•</span>
-                              <span>Action: Freeze / Verify</span>
+                              <span>Action: Escalate / Step-Up Review</span>
                             </div>
                           </div>
 
@@ -1919,12 +1950,12 @@ export default function App() {
                         <div className="space-y-2 pt-1">
                           <button
                             onClick={() => {
-                              setActionAlert('Funds Frozen immediately. Cryptographic transaction record committed to immutable audit ledger.');
+                              setActionAlert('Application-level risk hold recorded. Note: TrustShield AI is an advisory risk intelligence layer; direct PayPal account freezes are never executed.');
                               setTotpCode('');
                             }}
                             className="w-full py-2.5 px-4 rounded-lg bg-rose-600 hover:bg-rose-700 text-white font-semibold text-xs flex items-center justify-center gap-2 shadow-xs transition-colors cursor-pointer"
                           >
-                            <span className="material-symbols-outlined text-[16px]">lock</span> Freeze Funds (Immediate)
+                            <span className="material-symbols-outlined text-[16px]">lock</span> Apply Risk Hold (Simulated)
                           </button>
                           <button
                             onClick={() => {
@@ -1939,7 +1970,7 @@ export default function App() {
 
                         <div className="p-3 rounded-lg bg-[#f8f9fb] border border-[#e1e2e4] text-[11px] text-[#434655] flex items-start gap-2">
                           <span className="material-symbols-outlined text-[14px] text-blue-600 mt-0.5">info</span>
-                          <span>Actions are cryptographically signed with your active operator key and cannot be undone without quorum approval.</span>
+                          <span>Actions represent application-level underwriting decisions and advisory risk signals logged to the local audit ledger; TrustShield AI never alters PayPal balances or internal accounts directly.</span>
                         </div>
                       </div>
 
@@ -2195,13 +2226,28 @@ export default function App() {
                   </form>
 
                   {createdOrder && (
-                    <div className="p-3 rounded-lg bg-emerald-50 border border-emerald-200 text-xs space-y-1 text-emerald-900">
-                      <div className="font-bold flex items-center gap-1.5">
-                        <span className="material-symbols-outlined text-[16px] text-emerald-600">check_circle</span>
-                        Order Created: <span className="font-mono">{createdOrder.orderId}</span>
+                    <div className="p-3 rounded-lg bg-emerald-50 border border-emerald-200 text-xs space-y-2 text-emerald-900">
+                      <div className="font-bold flex items-center justify-between">
+                        <div className="flex items-center gap-1.5">
+                          <span className="material-symbols-outlined text-[16px] text-emerald-600">check_circle</span>
+                          Order Created: <span className="font-mono">{createdOrder.orderId}</span>
+                        </div>
+                        <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 border border-emerald-300">
+                          Ready for Capture
+                        </span>
                       </div>
-                      <div className="text-[11px] text-emerald-800">
-                        Status: <span className="font-semibold">{createdOrder.status}</span> | Mode: <span className="font-semibold">{createdOrder.isSandbox ? 'Sandbox' : 'Simulated'}</span>
+                      <div className="text-[11px] text-emerald-800 flex items-center justify-between flex-wrap gap-1">
+                        <span>Status: <strong className="font-semibold">{createdOrder.status}</strong> | Mode: <strong className="font-semibold">{createdOrder.isSandbox ? 'Live Sandbox' : 'Simulated'}</strong></span>
+                        {createdOrder.approveUrl && (
+                          <a
+                            href={createdOrder.approveUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-blue-700 underline hover:text-blue-900 font-semibold"
+                          >
+                            PayPal Sandbox Buyer Approval ↗
+                          </a>
+                        )}
                       </div>
                     </div>
                   )}
@@ -2221,30 +2267,30 @@ export default function App() {
 
                   <form onSubmit={handleCaptureOrder} className="space-y-3">
                     <div>
-                      <div className="flex items-center justify-between mb-1">
+                      <div className="flex items-center justify-between mb-1 flex-wrap gap-1">
                         <label className="text-xs font-semibold text-[#191c1e]">PayPal Order ID to Capture</label>
                         <div className="flex items-center gap-1.5 text-[11px]">
-                          <span className="text-[#434655]">Preset:</span>
+                          <span className="text-[#434655]">Offline Risk Presets:</span>
                           <button
                             type="button"
                             onClick={() => {
-                              setCaptureOrderId('5O190127TN364715T');
                               handleEvaluateSandboxTransaction('5O190127TN364715T', 25.0);
                             }}
                             className="text-blue-700 hover:underline font-mono"
+                            title="Evaluate $25 transaction risk telemetry"
                           >
-                            $25 Standard
+                            Score $25 Sample
                           </button>
                           <span>•</span>
                           <button
                             type="button"
                             onClick={() => {
-                              setCaptureOrderId('8AB91234XY789012Z');
                               handleEvaluateSandboxTransaction('8AB91234XY789012Z', 4500.0);
                             }}
                             className="text-rose-700 hover:underline font-mono"
+                            title="Evaluate $4,500 transaction risk telemetry"
                           >
-                            $4,500 High-Ticket
+                            Score $4,500 Sample
                           </button>
                         </div>
                       </div>
@@ -2252,9 +2298,24 @@ export default function App() {
                         type="text"
                         value={captureOrderId}
                         onChange={e => setCaptureOrderId(e.target.value)}
+                        placeholder={createdOrder?.orderId ? `Order from Step 1: ${createdOrder.orderId}` : "Create an order in Step 1 or enter a valid PayPal Order ID"}
                         className="w-full px-3 py-2 bg-[#f8f9fb] border border-[#e1e2e4] rounded-lg text-xs font-mono text-[#191c1e] focus:bg-white focus:ring-1 focus:ring-blue-600 outline-none"
-                        required
                       />
+                      {createdOrder && captureOrderId !== createdOrder.orderId && (
+                        <div className="mt-1 flex items-center gap-1.5 text-[11px] text-blue-700">
+                          <span>Active order from Step 1: <strong className="font-mono">{createdOrder.orderId}</strong></span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setCaptureOrderId(createdOrder.orderId);
+                              setCaptureError(null);
+                            }}
+                            className="underline hover:text-blue-900 font-semibold cursor-pointer"
+                          >
+                            Use This Order
+                          </button>
+                        </div>
+                      )}
                     </div>
 
                     {captureError && (
@@ -2266,7 +2327,7 @@ export default function App() {
                     <div className="flex gap-2">
                       <button
                         type="submit"
-                        disabled={loadingCapture}
+                        disabled={loadingCapture || !captureOrderId.trim()}
                         className="flex-1 py-2.5 px-4 bg-[#004ac6] hover:bg-[#003ea8] text-white text-xs font-semibold rounded-lg shadow-sm transition-colors cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2"
                       >
                         <span className="material-symbols-outlined text-[16px]">shopping_cart_checkout</span>
@@ -2275,7 +2336,7 @@ export default function App() {
 
                       <button
                         type="button"
-                        onClick={() => handleEvaluateSandboxTransaction(captureOrderId.trim())}
+                        onClick={() => handleEvaluateSandboxTransaction(captureOrderId.trim() || '5O190127TN364715T')}
                         disabled={loadingSandboxEval}
                         className="px-4 py-2.5 bg-[#f2f4f6] hover:bg-[#e7e8ea] text-[#191c1e] text-xs font-semibold rounded-lg border border-[#e1e2e4] transition-colors cursor-pointer flex items-center gap-1.5"
                       >
@@ -2356,7 +2417,9 @@ export default function App() {
                     </thead>
                     <tbody className="divide-y divide-[#e1e2e4] text-[#191c1e]">
                       <tr className="hover:bg-slate-50 transition-colors">
-                        <td className="py-3 px-4 font-mono font-semibold text-[#191c1e]">5O190127TN364715T</td>
+                        <td className="py-3 px-4 font-mono font-semibold text-[#191c1e]">
+                          5O190127TN364715T <span className="text-[10px] font-sans font-normal text-[#737686] bg-slate-100 px-1.5 py-0.5 rounded border border-[#e1e2e4]">Sample</span>
+                        </td>
                         <td className="py-3 px-4 font-mono text-[#434655] text-[11px]">2026-11-10 09:12:04</td>
                         <td className="py-3 px-4 font-mono text-blue-700">MERCHANT_GROWTH_001</td>
                         <td className="py-3 px-4 font-mono font-bold text-right text-[#191c1e]">$25.00 USD</td>
@@ -2371,17 +2434,19 @@ export default function App() {
                         <td className="py-3 px-4 text-right">
                           <button
                             onClick={() => {
-                              setCaptureOrderId('5O190127TN364715T');
                               handleEvaluateSandboxTransaction('5O190127TN364715T', 25.0);
                             }}
                             className="text-blue-600 hover:text-blue-800 font-semibold cursor-pointer"
+                            title="Evaluate offline telemetry risk signals"
                           >
-                            Inspect →
+                            Score Telemetry →
                           </button>
                         </td>
                       </tr>
                       <tr className="hover:bg-slate-50 transition-colors">
-                        <td className="py-3 px-4 font-mono font-semibold text-[#191c1e]">8AB91234XY789012Z</td>
+                        <td className="py-3 px-4 font-mono font-semibold text-[#191c1e]">
+                          8AB91234XY789012Z <span className="text-[10px] font-sans font-normal text-[#737686] bg-slate-100 px-1.5 py-0.5 rounded border border-[#e1e2e4]">Sample</span>
+                        </td>
                         <td className="py-3 px-4 font-mono text-[#434655] text-[11px]">2026-11-10 09:15:22</td>
                         <td className="py-3 px-4 font-mono text-blue-700">MERCHANT_COMPROMISED_002</td>
                         <td className="py-3 px-4 font-mono font-bold text-right text-rose-700">$4,500.00 USD</td>
@@ -2396,12 +2461,12 @@ export default function App() {
                         <td className="py-3 px-4 text-right">
                           <button
                             onClick={() => {
-                              setCaptureOrderId('8AB91234XY789012Z');
                               handleEvaluateSandboxTransaction('8AB91234XY789012Z', 4500.0);
                             }}
                             className="text-blue-600 hover:text-blue-800 font-semibold cursor-pointer"
+                            title="Evaluate offline telemetry risk signals"
                           >
-                            Inspect →
+                            Score Telemetry →
                           </button>
                         </td>
                       </tr>
