@@ -34,20 +34,20 @@ export const FraudIntelligenceCenter: React.FC = () => {
     <div className="space-y-6 text-slate-100">
       {/* Header Banner */}
       <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl flex flex-wrap items-center justify-between gap-4">
-        <div>
+        <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 mb-1">
             <span className="w-2.5 h-2.5 rounded-full bg-cyan-400"></span>
             <span className="text-xs uppercase font-bold text-cyan-400 tracking-wider font-mono">
               Global Risk Intelligence & Telemetry
             </span>
           </div>
-          <h2 className="text-xl font-black text-white">Fraud Intelligence & Graph Center</h2>
-          <p className="text-xs text-slate-400 mt-1 max-w-2xl">
+          <h2 className="text-xl font-black text-white break-words">Fraud Intelligence & Graph Center</h2>
+          <p className="text-xs text-slate-400 mt-1 max-w-2xl break-words">
             Correlate cross-merchant entity rings, shared bank payout destinations, unverified toll-free call centers, and temporal fraud densities.
           </p>
         </div>
 
-        <div className="flex items-center gap-2 text-xs">
+        <div className="flex items-center gap-2 text-xs shrink-0">
           <span className="px-3 py-1.5 rounded-xl bg-slate-800 border border-slate-700 text-slate-300 font-mono">
             Platform Heatmap: <strong className="text-emerald-400 font-bold">Simulated Data</strong>
           </span>

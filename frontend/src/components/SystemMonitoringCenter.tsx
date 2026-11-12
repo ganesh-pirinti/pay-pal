@@ -63,15 +63,15 @@ export const SystemMonitoringCenter: React.FC = () => {
     <div className="space-y-6 text-slate-100">
       {/* Banner */}
       <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl flex flex-wrap items-center justify-between gap-4">
-        <div>
+        <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 mb-1">
             <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
             <span className="text-xs uppercase font-bold text-emerald-400 tracking-wider font-mono">
               Live System Telemetry & Probes
             </span>
           </div>
-          <h2 className="text-xl font-black text-white">System Monitoring & Observability</h2>
-          <p className="text-xs text-slate-400 mt-1 max-w-2xl">
+          <h2 className="text-xl font-black text-white break-words">System Monitoring & Observability</h2>
+          <p className="text-xs text-slate-400 mt-1 max-w-2xl break-words">
             Real-time memory footprints, $p_{95}$ latency percentiles, sliding-window rate limiters, and production health probes.
           </p>
         </div>
@@ -79,7 +79,7 @@ export const SystemMonitoringCenter: React.FC = () => {
         <button
           onClick={fetchDiagnostics}
           disabled={isLoading}
-          className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-slate-200 border border-slate-700 text-xs font-semibold transition-colors flex items-center gap-2"
+          className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-slate-200 border border-slate-700 text-xs font-semibold transition-colors flex items-center gap-2 shrink-0"
         >
           <span>🔄</span> {isLoading ? 'Refreshing...' : 'Refresh Telemetry'}
         </button>
@@ -87,32 +87,32 @@ export const SystemMonitoringCenter: React.FC = () => {
 
       {/* KPI Gauges */}
       {diagnostics && (
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-sm">
-            <span className="text-xs text-slate-400 block mb-1">API Latency (p95)</span>
-            <span className="font-mono text-2xl font-bold text-emerald-400">
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-sm min-w-0">
+            <span className="text-xs text-slate-400 block mb-1 truncate">API Latency (p95)</span>
+            <span className="font-mono text-2xl font-bold text-emerald-400 truncate block">
               {diagnostics.metrics?.p95ApiLatencyMs || 12} ms
             </span>
-            <span className="text-[10px] text-slate-500 block mt-1">Avg: {diagnostics.metrics?.averageApiLatencyMs || 8} ms</span>
+            <span className="text-[10px] text-slate-500 block mt-1 truncate">Avg: {diagnostics.metrics?.averageApiLatencyMs || 8} ms</span>
           </div>
 
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-sm">
-            <span className="text-xs text-slate-400 block mb-1">Process Memory (Heap)</span>
-            <span className="font-mono text-2xl font-bold text-blue-400">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-sm min-w-0">
+            <span className="text-xs text-slate-400 block mb-1 truncate">Process Memory (Heap)</span>
+            <span className="font-mono text-2xl font-bold text-blue-400 truncate block">
               {diagnostics.memory?.heapUsedMB || 42} MB
             </span>
-            <span className="text-[10px] text-slate-500 block mt-1">RSS: {diagnostics.memory?.rssMB || 78} MB</span>
+            <span className="text-[10px] text-slate-500 block mt-1 truncate">RSS: {diagnostics.memory?.rssMB || 78} MB</span>
           </div>
 
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-sm">
-            <span className="text-xs text-slate-400 block mb-1">Cache Hit Ratio</span>
-            <span className="font-mono text-2xl font-bold text-purple-400">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-sm min-w-0">
+            <span className="text-xs text-slate-400 block mb-1 truncate">Cache Hit Ratio</span>
+            <span className="font-mono text-2xl font-bold text-purple-400 truncate block">
               {diagnostics.cache ? `${diagnostics.cache.hitRatioPercentage}%` : '94.2%'}
             </span>
-            <span className="text-[10px] text-slate-500 block mt-1">Coalesced Requests Active</span>
+            <span className="text-[10px] text-slate-500 block mt-1 truncate">Coalesced Requests Active</span>
           </div>
 
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-sm">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-sm min-w-0">
             <span className="text-xs text-slate-400 block mb-1">System Uptime</span>
             <span className="font-mono text-2xl font-bold text-slate-100">
               {Math.floor((diagnostics.uptimeSeconds || 3600) / 60)} min

@@ -36,15 +36,15 @@ export const KnowledgeCenter: React.FC = () => {
     <div className="space-y-6 text-slate-100">
       {/* Banner */}
       <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl flex flex-wrap items-center justify-between gap-4">
-        <div>
+        <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 mb-1">
             <span className="w-2.5 h-2.5 rounded-full bg-blue-500"></span>
             <span className="text-xs uppercase font-bold text-blue-400 tracking-wider font-mono">
               Operational Playbooks & Regulatory Standards
             </span>
           </div>
-          <h2 className="text-xl font-black text-white">Threat Knowledge Base & Playbooks</h2>
-          <p className="text-xs text-slate-400 mt-1 max-w-2xl">
+          <h2 className="text-xl font-black text-white break-words">Threat Knowledge Base & Playbooks</h2>
+          <p className="text-xs text-slate-400 mt-1 max-w-2xl break-words">
             Verified PayPal fraud typologies, underwriting standard operating procedures (SOPs), and statutory compliance frameworks.
           </p>
         </div>
@@ -55,7 +55,7 @@ export const KnowledgeCenter: React.FC = () => {
           value={searchQuery}
           onChange={e => setSearchQuery(e.target.value)}
           placeholder="Search typologies, SOPs, or regulations..."
-          className="bg-slate-800 border border-slate-700 rounded-xl px-4 py-2 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-blue-500 w-72"
+          className="bg-slate-800 border border-slate-700 rounded-xl px-4 py-2 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-blue-500 w-full sm:w-72 shrink-0"
         />
       </div>
 

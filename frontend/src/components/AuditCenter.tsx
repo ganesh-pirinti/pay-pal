@@ -53,12 +53,40 @@ export const AuditCenter: React.FC = () => {
     return () => { isSubscribed = false; };
   }, []);
 
-  const handleExportCsv = () => {
-    window.open('/api/audit/export?format=csv', '_blank');
+  const handleExportCsv = async () => {
+    try {
+      const res = await fetch('/api/audit/export?format=csv');
+      if (!res.ok) throw new Error('Export CSV failed');
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `trustshield_audit_log_${new Date().toISOString().slice(0, 10)}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch {
+      window.open('/api/audit/export?format=csv', '_blank');
+    }
   };
 
-  const handleExportJson = () => {
-    window.open('/api/audit/export?format=json', '_blank');
+  const handleExportJson = async () => {
+    try {
+      const res = await fetch('/api/audit/export?format=json');
+      if (!res.ok) throw new Error('Export JSON failed');
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `trustshield_audit_log_${new Date().toISOString().slice(0, 10)}.json`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch {
+      window.open('/api/audit/export?format=json', '_blank');
+    }
   };
 
   const filteredLogs = logs.filter(l => {
@@ -92,21 +120,21 @@ export const AuditCenter: React.FC = () => {
     <div className="space-y-6 text-[#191c1e]">
       {/* Banner */}
       <div className="bg-white border border-[#e1e2e4] rounded-xl p-6 shadow-sm flex flex-wrap items-center justify-between gap-4">
-        <div>
+        <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 mb-1">
             <span className="w-2.5 h-2.5 rounded-full bg-blue-600"></span>
             <span className="text-xs uppercase font-semibold text-blue-700 tracking-wider">
               Cryptographic Audit Compliance
             </span>
           </div>
-          <h2 className="text-xl font-bold text-[#191c1e]">Immutable Underwriting Audit Center</h2>
-          <p className="text-xs text-[#434655] mt-1 max-w-2xl">
+          <h2 className="text-xl font-bold text-[#191c1e] break-words">Immutable Underwriting Audit Center</h2>
+          <p className="text-xs text-[#434655] mt-1 max-w-2xl break-words">
             Every underwriter review action, automated risk calculation, rule modification, and security quarantine is recorded with a tamper-evident SHA-256 checksum.
           </p>
         </div>
 
         {/* Export & Verify Actions */}
-        <div className="flex items-center gap-2 text-xs">
+        <div className="flex items-center gap-2 text-xs shrink-0 flex-wrap">
           <button
             onClick={handleVerifyIntegrity}
             disabled={isVerifying}

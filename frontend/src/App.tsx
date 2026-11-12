@@ -346,6 +346,25 @@ export default function App() {
     fetchSandboxStatus();
   };
 
+  const handleExportCsv = async () => {
+    try {
+      const res = await fetch('/api/audit/export?format=csv');
+      if (!res.ok) throw new Error('Export request failed');
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `paypal_trustshield_audit_${new Date().toISOString().slice(0, 10)}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      setActionAlert('Cryptographic audit trail CSV successfully exported.');
+    } catch {
+      window.open('/api/audit/export?format=csv', '_blank');
+    }
+  };
+
   const handleAnalyzeSeller = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     setLoadingSeller(true);
@@ -640,7 +659,7 @@ export default function App() {
   const activeNavLabel = navItems.find(n => n.id === activeTab)?.label || 'Overview';
 
   return (
-    <div className="min-h-screen bg-[#f8f9fb] text-[#191c1e] font-sans antialiased">
+    <div className="min-h-screen bg-[#f8f9fb] text-[#191c1e] font-sans antialiased overflow-x-hidden">
       {/* Mobile Drawer Overlay */}
       {isMobileMenuOpen && (
         <div
@@ -651,16 +670,20 @@ export default function App() {
 
       {/* Fixed Left Sidebar (240px wide, matching prototype) */}
       <aside
-        className={`fixed left-0 top-0 h-full w-[240px] bg-[#f2f4f6] border-r border-[#e1e2e4] z-50 flex flex-col justify-between py-6 transition-transform duration-200 lg:translate-x-0 ${
-          isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
+        className={`fixed left-0 top-0 h-full w-[240px] bg-[#f2f4f6] border-r border-[#e1e2e4] z-50 flex flex-col justify-between py-6 transition-all duration-200 lg:translate-x-0 lg:visible lg:pointer-events-auto ${
+          isMobileMenuOpen
+            ? 'translate-x-0 visible pointer-events-auto shadow-2xl'
+            : '-translate-x-full invisible pointer-events-none'
         }`}
       >
         <div className="flex flex-col">
           {/* Logo & Brand Header */}
           <div className="px-5 mb-8 flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-[#004ac6] flex items-center justify-center text-white shadow-sm shrink-0">
-              <span className="material-symbols-outlined text-[20px]">shield</span>
-            </div>
+            <img
+              src="/trustshield-logo.jpg"
+              alt="TrustShield AI Logo"
+              className="w-9 h-9 rounded-lg object-cover shadow-sm shrink-0 border border-[#004ac6]/20 bg-[#0d1b2a]"
+            />
             <div className="flex flex-col">
               <span className="font-semibold text-lg text-[#191c1e] tracking-tight leading-tight">
                 TrustShield AI
@@ -722,43 +745,48 @@ export default function App() {
       </aside>
 
       {/* Main Container (offset 240px on desktop) */}
-      <div className="lg:pl-[240px]">
+      <div className="lg:pl-[240px] min-w-0">
         {/* Fixed Top Header (matches prototype) */}
-        <header className="fixed top-0 lg:left-[240px] left-0 right-0 h-16 bg-[#f8f9fb]/90 backdrop-blur-xl border-b border-[#e1e2e4] z-40 flex items-center justify-between px-6">
+        <header className="fixed top-0 lg:left-[240px] left-0 right-0 h-16 bg-[#f8f9fb]/90 backdrop-blur-xl border-b border-[#e1e2e4] z-40 flex items-center justify-between px-4 sm:px-6">
           {/* Mobile hamburger & Breadcrumb */}
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 min-w-0">
             <button
               onClick={() => setIsMobileMenuOpen(prev => !prev)}
-              className="lg:hidden p-1.5 text-[#434655] hover:text-[#191c1e] hover:bg-slate-200/50 rounded-lg"
+              className="lg:hidden p-1.5 text-[#434655] hover:text-[#191c1e] hover:bg-slate-200/50 rounded-lg shrink-0"
               aria-label="Toggle mobile navigation"
             >
               <span className="material-symbols-outlined text-[22px]">menu</span>
             </button>
-            <div className="flex items-center gap-2 text-sm">
-              <span className="text-[#434655] font-normal">TrustShield</span>
-              <span className="text-[#737686]">/</span>
-              <span className="text-[#191c1e] font-semibold">{activeNavLabel}</span>
+            <div className="flex items-center gap-2 text-sm min-w-0">
+              <img
+                src="/trustshield-logo.jpg"
+                alt="Logo"
+                className="w-5 h-5 rounded object-cover shadow-xs border border-blue-200 lg:hidden shrink-0"
+              />
+              <span className="text-[#434655] font-normal shrink-0">TrustShield</span>
+              <span className="text-[#737686] shrink-0">/</span>
+              <span className="text-[#191c1e] font-semibold truncate">{activeNavLabel}</span>
             </div>
           </div>
 
           {/* Search Bar & Quick Actions */}
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3 shrink-0">
             {/* Global Search Bar */}
-            <div className="relative hidden md:flex items-center">
+            <div className="relative hidden xl:flex items-center">
               <span className="material-symbols-outlined absolute left-3 text-[#737686] text-[18px]">
                 search
               </span>
               <input
                 type="text"
                 placeholder="Search transactions, cases, merchants..."
-                className="w-72 pl-9 pr-3 py-1.5 bg-[#f2f4f6] text-[#191c1e] text-xs rounded-lg outline-none focus:ring-1 focus:ring-[#004ac6] border border-transparent focus:border-[#004ac6] transition-all"
+                className="w-52 2xl:w-72 pl-9 pr-3 py-1.5 bg-[#f2f4f6] text-[#191c1e] text-xs rounded-lg outline-none focus:ring-1 focus:ring-[#004ac6] border border-transparent focus:border-[#004ac6] transition-all"
               />
             </div>
 
             {/* AI Copilot Shortcut Button */}
             <button
               onClick={() => setIsCopilotOpen(true)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100 text-xs font-semibold border border-blue-200 transition-colors cursor-pointer"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100 text-xs font-semibold border border-blue-200 transition-colors cursor-pointer shrink-0"
               title="Open PayPal TrustShield AI Copilot (Ctrl + K)"
             >
               <span className="material-symbols-outlined text-[16px]">smart_toy</span>
@@ -771,26 +799,26 @@ export default function App() {
             {/* Reset Demo State Button */}
             <button
               onClick={handleResetDemo}
-              className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-[#edeef0] text-[#434655] hover:text-[#191c1e] hover:bg-[#e1e2e4] text-xs font-medium transition-colors cursor-pointer"
+              className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-[#edeef0] text-[#434655] hover:text-[#191c1e] hover:bg-[#e1e2e4] text-xs font-medium transition-colors cursor-pointer shrink-0"
               title="Reset All Local State to Demo Defaults"
             >
               <span className="material-symbols-outlined text-[16px]">restart_alt</span>
-              <span className="hidden md:inline">Reset</span>
+              <span className="hidden lg:inline">Reset</span>
             </button>
 
             {/* System Diagnostics Trigger */}
             <button
               onClick={() => setShowDiagnosticsModal(true)}
-              className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-[#edeef0] text-[#434655] hover:text-[#191c1e] hover:bg-[#e1e2e4] text-xs font-medium transition-colors cursor-pointer"
+              className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-[#edeef0] text-[#434655] hover:text-[#191c1e] hover:bg-[#e1e2e4] text-xs font-medium transition-colors cursor-pointer shrink-0"
               title="Open System Diagnostics & Metrics"
             >
               <span className="material-symbols-outlined text-[16px]">tune</span>
-              <span className="hidden md:inline">Diagnostics</span>
+              <span className="hidden lg:inline">Diagnostics</span>
             </button>
 
             {/* Notification Bell */}
             <button
-              className="relative p-2 rounded-lg text-[#434655] hover:bg-[#edeef0] hover:text-[#191c1e] transition-colors cursor-pointer"
+              className="relative p-2 rounded-lg text-[#434655] hover:bg-[#edeef0] hover:text-[#191c1e] transition-colors cursor-pointer shrink-0"
               title="Notifications"
             >
               <span className="material-symbols-outlined text-[20px]">notifications</span>
@@ -800,7 +828,7 @@ export default function App() {
         </header>
 
         {/* Main Content Viewport */}
-        <main className="pt-20 px-6 pb-12 max-w-7xl mx-auto space-y-6">
+        <main className="pt-20 px-4 sm:px-6 lg:px-8 pb-12 max-w-7xl mx-auto space-y-6 min-w-0 w-full">
           {actionAlert && (
             <div className="p-4 rounded-xl bg-blue-50 border border-blue-200 text-blue-900 text-xs flex items-center justify-between shadow-xs">
               <div className="flex items-center gap-2">
@@ -823,24 +851,24 @@ export default function App() {
             <div className="space-y-6">
               {/* Header Title Section */}
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div>
-                  <h1 className="text-2xl font-bold text-[#191c1e] tracking-tight">
+                <div className="min-w-0 flex-1">
+                  <h1 className="text-2xl font-bold text-[#191c1e] tracking-tight break-words">
                     Executive Risk &amp; Fraud Overview
                   </h1>
-                  <p className="text-sm text-[#434655] mt-1">
+                  <p className="text-sm text-[#434655] mt-1 break-words">
                     Real-time AI telemetry, merchant volatility assessment, and synthetic threat detection.
                   </p>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap shrink-0">
                   <button
-                    onClick={() => window.open('/api/audit/export?format=csv', '_blank')}
-                    className="flex items-center gap-1.5 px-3.5 py-2 bg-white hover:bg-slate-50 text-[#191c1e] text-xs font-semibold rounded-lg border border-[#e1e2e4] shadow-xs transition-colors cursor-pointer"
+                    onClick={handleExportCsv}
+                    className="flex items-center gap-1.5 px-3.5 py-2 bg-white hover:bg-slate-50 text-[#191c1e] text-xs font-semibold rounded-lg border border-[#e1e2e4] shadow-xs transition-colors cursor-pointer shrink-0"
                   >
                     <span className="material-symbols-outlined text-[16px]">download</span> Export CSV
                   </button>
                   <button
                     onClick={() => handleRunPresetSeller(0)}
-                    className="flex items-center gap-1.5 px-3.5 py-2 bg-[#004ac6] hover:bg-[#003ea8] text-white text-xs font-semibold rounded-lg shadow-sm transition-colors cursor-pointer"
+                    className="flex items-center gap-1.5 px-3.5 py-2 bg-[#004ac6] hover:bg-[#003ea8] text-white text-xs font-semibold rounded-lg shadow-sm transition-colors cursor-pointer shrink-0"
                   >
                     <span className="material-symbols-outlined text-[16px]">bolt</span> Simulate Holiday Surge
                   </button>
@@ -848,130 +876,134 @@ export default function App() {
               </div>
 
               {/* Top 4 KPI Metrics Strip (matches prototype) */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
                 {/* Metric 1 */}
-                <div className="bg-white border border-[#e1e2e4] p-5 rounded-xl shadow-xs flex flex-col justify-between">
-                  <div className="flex items-center justify-between text-[#434655] mb-2">
-                    <span className="text-xs uppercase font-semibold tracking-wider">Total Volume (24h)</span>
-                    <span className="material-symbols-outlined text-[20px] text-blue-600">payments</span>
+                <div className="bg-white border border-[#e1e2e4] p-5 rounded-xl shadow-xs flex flex-col justify-between min-w-0">
+                  <div className="flex items-center justify-between text-[#434655] mb-2 gap-2">
+                    <span className="text-xs uppercase font-semibold tracking-wider truncate">Total Volume (24h)</span>
+                    <span className="material-symbols-outlined text-[20px] text-blue-600 shrink-0">payments</span>
                   </div>
                   <div>
-                    <div className="text-2xl font-bold text-[#191c1e] font-mono">$1,248,590.00</div>
-                    <div className="flex items-center gap-1 text-xs text-emerald-700 mt-1 font-medium">
-                      <span className="material-symbols-outlined text-[14px]">trending_up</span>
-                      +12.4% from yesterday
+                    <div className="text-2xl font-bold text-[#191c1e] font-mono tracking-tight truncate">$1,248,590.00</div>
+                    <div className="flex items-center gap-1.5 text-xs text-emerald-700 mt-1 font-medium flex-wrap">
+                      <span className="material-symbols-outlined text-[14px] shrink-0">trending_up</span>
+                      <span>+12.4% from yesterday</span>
+                      <span className="text-[10px] text-[#737686] bg-slate-100 px-1.5 py-0.5 rounded border border-[#e1e2e4] font-normal">Simulated</span>
                     </div>
                   </div>
                 </div>
 
                 {/* Metric 2 */}
-                <div className="bg-white border border-[#e1e2e4] p-5 rounded-xl shadow-xs flex flex-col justify-between">
-                  <div className="flex items-center justify-between text-[#434655] mb-2">
-                    <span className="text-xs uppercase font-semibold tracking-wider">Flagged Risk Events</span>
-                    <span className="material-symbols-outlined text-[20px] text-rose-600">gpp_bad</span>
+                <div className="bg-white border border-[#e1e2e4] p-5 rounded-xl shadow-xs flex flex-col justify-between min-w-0">
+                  <div className="flex items-center justify-between text-[#434655] mb-2 gap-2">
+                    <span className="text-xs uppercase font-semibold tracking-wider truncate">Flagged Risk Events</span>
+                    <span className="material-symbols-outlined text-[20px] text-rose-600 shrink-0">gpp_bad</span>
                   </div>
                   <div>
-                    <div className="text-2xl font-bold text-[#191c1e] font-mono">
+                    <div className="text-2xl font-bold text-[#191c1e] font-mono tracking-tight truncate">
                       {summary?.highRiskCases ?? 38}
                     </div>
-                    <div className="flex items-center gap-1 text-xs text-rose-700 mt-1 font-medium">
-                      <span className="material-symbols-outlined text-[14px]">warning</span>
-                      Requires immediate review
+                    <div className="flex items-center gap-1.5 text-xs text-rose-700 mt-1 font-medium flex-wrap">
+                      <span className="material-symbols-outlined text-[14px] shrink-0">warning</span>
+                      <span>Requires review</span>
+                      <span className="text-[10px] text-[#737686] bg-slate-100 px-1.5 py-0.5 rounded border border-[#e1e2e4] font-normal">Demo</span>
                     </div>
                   </div>
                 </div>
 
                 {/* Metric 3 */}
-                <div className="bg-white border border-[#e1e2e4] p-5 rounded-xl shadow-xs flex flex-col justify-between">
-                  <div className="flex items-center justify-between text-[#434655] mb-2">
-                    <span className="text-xs uppercase font-semibold tracking-wider">Auto-Cleared</span>
-                    <span className="material-symbols-outlined text-[20px] text-emerald-600">verified_user</span>
+                <div className="bg-white border border-[#e1e2e4] p-5 rounded-xl shadow-xs flex flex-col justify-between min-w-0">
+                  <div className="flex items-center justify-between text-[#434655] mb-2 gap-2">
+                    <span className="text-xs uppercase font-semibold tracking-wider truncate">Auto-Cleared</span>
+                    <span className="material-symbols-outlined text-[20px] text-emerald-600 shrink-0">verified_user</span>
                   </div>
                   <div>
-                    <div className="text-2xl font-bold text-[#191c1e] font-mono">
+                    <div className="text-2xl font-bold text-[#191c1e] font-mono tracking-tight truncate">
                       {summary?.totalTransactionsAnalyzed ? (summary.totalTransactionsAnalyzed - (summary.highRiskCases || 0)).toLocaleString() : '14,782'}
                     </div>
-                    <div className="flex items-center gap-1 text-xs text-emerald-700 mt-1 font-medium">
-                      <span className="material-symbols-outlined text-[14px]">check_circle</span>
-                      98.4% clearance rate
+                    <div className="flex items-center gap-1.5 text-xs text-emerald-700 mt-1 font-medium flex-wrap">
+                      <span className="material-symbols-outlined text-[14px] shrink-0">check_circle</span>
+                      <span>98.4% clearance rate</span>
+                      <span className="text-[10px] text-[#737686] bg-slate-100 px-1.5 py-0.5 rounded border border-[#e1e2e4] font-normal">Demo</span>
                     </div>
                   </div>
                 </div>
 
                 {/* Metric 4 */}
-                <div className="bg-white border border-[#e1e2e4] p-5 rounded-xl shadow-xs flex flex-col justify-between">
-                  <div className="flex items-center justify-between text-[#434655] mb-2">
-                    <span className="text-xs uppercase font-semibold tracking-wider">Model Precision</span>
-                    <span className="material-symbols-outlined text-[20px] text-amber-600">analytics</span>
+                <div className="bg-white border border-[#e1e2e4] p-5 rounded-xl shadow-xs flex flex-col justify-between min-w-0">
+                  <div className="flex items-center justify-between text-[#434655] mb-2 gap-2">
+                    <span className="text-xs uppercase font-semibold tracking-wider truncate">Model Precision</span>
+                    <span className="material-symbols-outlined text-[20px] text-amber-600 shrink-0">analytics</span>
                   </div>
                   <div>
-                    <div className="text-2xl font-bold text-[#191c1e] font-mono">99.8%</div>
-                    <div className="flex items-center gap-1 text-xs text-[#434655] mt-1 font-medium">
-                      <span className="material-symbols-outlined text-[14px]">shield</span>
-                      0.0% False Positive Rate
+                    <div className="text-2xl font-bold text-[#191c1e] font-mono tracking-tight truncate">99.8%</div>
+                    <div className="flex items-center gap-1.5 text-xs text-[#434655] mt-1 font-medium flex-wrap">
+                      <span className="material-symbols-outlined text-[14px] shrink-0">shield</span>
+                      <span>0.0% False Positive Rate</span>
+                      <span className="text-[10px] text-[#737686] bg-slate-100 px-1.5 py-0.5 rounded border border-[#e1e2e4] font-normal">Benchmark</span>
                     </div>
                   </div>
                 </div>
               </div>
 
               {/* 1-Click Quick Scenario Dispatchers */}
-              <div className="bg-white border border-[#e1e2e4] rounded-xl p-5 shadow-xs">
-                <div className="flex items-center justify-between mb-3">
+              <div className="bg-white border border-[#e1e2e4] rounded-xl p-5 shadow-xs min-w-0">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-3 gap-1">
                   <div className="flex items-center gap-2">
                     <span className="material-symbols-outlined text-[18px] text-blue-600">flag</span>
                     <h2 className="text-sm font-bold text-[#191c1e]">1-Click Hackathon Evaluation Presets</h2>
                   </div>
-                  <span className="text-xs text-[#434655]">Direct execution triggers</span>
+                  <span className="text-xs text-[#737686]">(Simulated benchmark scenarios)</span>
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
                   <button
                     onClick={() => handleRunPresetSeller(0)}
-                    className="p-3 rounded-lg border border-[#e1e2e4] hover:border-emerald-500 bg-[#f8f9fb] hover:bg-emerald-50/40 text-left transition-all cursor-pointer group"
+                    className="p-3.5 rounded-lg border border-[#e1e2e4] hover:border-emerald-500 bg-[#f8f9fb] hover:bg-emerald-50/40 text-left transition-all cursor-pointer group flex flex-col justify-between min-w-0 h-full"
                   >
-                    <div className="flex items-center justify-between text-xs font-bold text-emerald-700">
-                      <span>Holiday Sales Spike</span>
-                      <span>+218%</span>
+                    <div className="flex items-start justify-between text-xs font-bold text-emerald-700 gap-1.5">
+                      <span className="font-bold leading-tight">Holiday Sales Spike</span>
+                      <span className="shrink-0 px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 text-[10px] font-mono font-semibold">+218%</span>
                     </div>
-                    <p className="text-[11px] text-[#434655] mt-1 leading-relaxed">
+                    <p className="text-[11px] text-[#434655] mt-2 leading-relaxed">
                       Legitimate surge with 0% dispute rate. Distinguishes growth from fraud.
                     </p>
                   </button>
 
                   <button
                     onClick={() => handleRunPresetSeller(1)}
-                    className="p-3 rounded-lg border border-[#e1e2e4] hover:border-rose-500 bg-[#f8f9fb] hover:bg-rose-50/40 text-left transition-all cursor-pointer group"
+                    className="p-3.5 rounded-lg border border-[#e1e2e4] hover:border-rose-500 bg-[#f8f9fb] hover:bg-rose-50/40 text-left transition-all cursor-pointer group flex flex-col justify-between min-w-0 h-full"
                   >
-                    <div className="flex items-center justify-between text-xs font-bold text-rose-700">
-                      <span>Compromised Surge</span>
-                      <span>ATO Attack</span>
+                    <div className="flex items-start justify-between text-xs font-bold text-rose-700 gap-1.5">
+                      <span className="font-bold leading-tight">Compromised Surge</span>
+                      <span className="shrink-0 px-1.5 py-0.5 rounded bg-rose-100 text-rose-800 text-[10px] font-mono font-semibold">ATO Attack</span>
                     </div>
-                    <p className="text-[11px] text-[#434655] mt-1 leading-relaxed">
+                    <p className="text-[11px] text-[#434655] mt-2 leading-relaxed">
                       +300% volume with 30% disputes and unverified payers. High risk flag.
                     </p>
                   </button>
 
                   <button
                     onClick={() => handleRunPresetInvoice(0)}
-                    className="p-3 rounded-lg border border-[#e1e2e4] hover:border-amber-500 bg-[#f8f9fb] hover:bg-amber-50/40 text-left transition-all cursor-pointer group"
+                    className="p-3.5 rounded-lg border border-[#e1e2e4] hover:border-amber-500 bg-[#f8f9fb] hover:bg-amber-50/40 text-left transition-all cursor-pointer group flex flex-col justify-between min-w-0 h-full"
                   >
-                    <div className="flex items-center justify-between text-xs font-bold text-amber-700">
-                      <span>Geek Squad Scam</span>
-                      <span>$499 Phish</span>
+                    <div className="flex items-start justify-between text-xs font-bold text-amber-700 gap-1.5">
+                      <span className="font-bold leading-tight">Geek Squad Scam</span>
+                      <span className="shrink-0 px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 text-[10px] font-mono font-semibold">$499 Phish</span>
                     </div>
-                    <p className="text-[11px] text-[#434655] mt-1 leading-relaxed">
+                    <p className="text-[11px] text-[#434655] mt-2 leading-relaxed">
                       Brand spoofing, toll-free callback threat, fake subscription auto-renewal.
                     </p>
                   </button>
 
                   <button
                     onClick={() => handleRunPresetInvoice(2)}
-                    className="p-3 rounded-lg border border-[#e1e2e4] hover:border-purple-500 bg-[#f8f9fb] hover:bg-purple-50/40 text-left transition-all cursor-pointer group"
+                    className="p-3.5 rounded-lg border border-[#e1e2e4] hover:border-purple-500 bg-[#f8f9fb] hover:bg-purple-50/40 text-left transition-all cursor-pointer group flex flex-col justify-between min-w-0 h-full"
                   >
-                    <div className="flex items-center justify-between text-xs font-bold text-purple-700">
-                      <span>Prompt Injection</span>
-                      <span>Adversarial</span>
+                    <div className="flex items-start justify-between text-xs font-bold text-purple-700 gap-1.5">
+                      <span className="font-bold leading-tight">Prompt Injection</span>
+                      <span className="shrink-0 px-1.5 py-0.5 rounded bg-purple-100 text-purple-800 text-[10px] font-mono font-semibold">Adversarial</span>
                     </div>
-                    <p className="text-[11px] text-[#434655] mt-1 leading-relaxed">
+                    <p className="text-[11px] text-[#434655] mt-2 leading-relaxed">
                       "Ignore all previous instructions" malicious attack neutralized &amp; quarantined.
                     </p>
                   </button>
@@ -1133,15 +1165,15 @@ export default function App() {
           {activeTab === 'seller' && (
             <div className="space-y-6">
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div>
-                  <h1 className="text-2xl font-bold text-[#191c1e] tracking-tight">
+                <div className="min-w-0 flex-1">
+                  <h1 className="text-2xl font-bold text-[#191c1e] tracking-tight break-words">
                     Seller Protection Intelligence
                   </h1>
-                  <p className="text-sm text-[#434655] mt-1">
+                  <p className="text-sm text-[#434655] mt-1 break-words">
                     Distinguish legitimate holiday sales spikes from fraudulent account takeovers using explainable AI.
                   </p>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 shrink-0">
                   <select
                     onChange={e => handleRunPresetSeller(Number(e.target.value))}
                     className="px-3 py-2 bg-white border border-[#e1e2e4] rounded-lg text-xs font-medium text-[#191c1e] focus:ring-1 focus:ring-blue-600 outline-none shadow-xs cursor-pointer"
@@ -1356,18 +1388,18 @@ export default function App() {
             <div className="space-y-6">
               {/* Top Header Strip (matches prototype) */}
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <h1 className="text-2xl font-bold text-[#191c1e] tracking-tight">Invoice review</h1>
-                    <span className="px-2 py-0.5 bg-blue-100 text-blue-900 text-xs rounded font-medium">
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h1 className="text-2xl font-bold text-[#191c1e] tracking-tight break-words">Invoice review</h1>
+                    <span className="px-2 py-0.5 bg-blue-100 text-blue-900 text-xs rounded font-medium shrink-0">
                       Active Case #INV-2024-8991
                     </span>
                   </div>
-                  <p className="text-sm text-[#434655] mt-1">
+                  <p className="text-sm text-[#434655] mt-1 break-words">
                     Check payment requests for impersonation and suspicious instructions.
                   </p>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 shrink-0">
                   <div className="flex items-center gap-1.5 bg-[#edeef0] px-3 py-1.5 rounded-lg border border-[#e1e2e4]">
                     <span className="text-xs text-[#434655] font-medium">Preset:</span>
                     <select
@@ -2071,13 +2103,13 @@ export default function App() {
             <div className="space-y-6">
               {/* Header (matches prototype) */}
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div>
-                  <h1 className="text-2xl font-bold text-[#191c1e] tracking-tight">PayPal Transactions</h1>
-                  <p className="text-sm text-[#434655] mt-1">
+                <div className="min-w-0 flex-1">
+                  <h1 className="text-2xl font-bold text-[#191c1e] tracking-tight break-words">PayPal Transactions</h1>
+                  <p className="text-sm text-[#434655] mt-1 break-words">
                     Inspect real-time transaction streams, sandbox payloads, and local demo records.
                   </p>
                 </div>
-                <div className="flex items-center gap-2 flex-wrap">
+                <div className="flex items-center gap-2 flex-wrap shrink-0">
                   {sandboxStatus && (
                     <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-50 border border-blue-200 text-blue-900 text-xs">
                       <span className="w-2 h-2 rounded-full bg-blue-600"></span>
@@ -2085,14 +2117,14 @@ export default function App() {
                     </div>
                   )}
                   <button
-                    onClick={() => window.open('/api/audit/export?format=csv', '_blank')}
-                    className="flex items-center gap-1.5 px-3.5 py-2 bg-white hover:bg-slate-50 text-[#191c1e] text-xs font-semibold rounded-lg border border-[#e1e2e4] shadow-xs transition-colors cursor-pointer"
+                    onClick={handleExportCsv}
+                    className="flex items-center gap-1.5 px-3.5 py-2 bg-white hover:bg-slate-50 text-[#191c1e] text-xs font-semibold rounded-lg border border-[#e1e2e4] shadow-xs transition-colors cursor-pointer shrink-0"
                   >
                     <span className="material-symbols-outlined text-[16px]">download</span> Export CSV
                   </button>
                   <button
                     onClick={() => fetchSummary()}
-                    className="flex items-center gap-1.5 px-3.5 py-2 bg-[#004ac6] hover:bg-[#003ea8] text-white text-xs font-semibold rounded-lg shadow-sm transition-colors cursor-pointer"
+                    className="flex items-center gap-1.5 px-3.5 py-2 bg-[#004ac6] hover:bg-[#003ea8] text-white text-xs font-semibold rounded-lg shadow-sm transition-colors cursor-pointer shrink-0"
                   >
                     <span className="material-symbols-outlined text-[16px]">sync</span> Sync Stream
                   </button>
@@ -2100,59 +2132,63 @@ export default function App() {
               </div>
 
               {/* 4 Top Metric Cards (matches prototype) */}
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <div className="bg-white border border-[#e1e2e4] p-5 rounded-xl shadow-xs flex flex-col justify-between">
-                  <div className="flex items-center justify-between text-[#434655] mb-2">
-                    <span className="text-xs uppercase font-semibold tracking-wider">Total Volume (24h)</span>
-                    <span className="material-symbols-outlined text-[20px] text-blue-600">payments</span>
+              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+                <div className="bg-white border border-[#e1e2e4] p-5 rounded-xl shadow-xs flex flex-col justify-between min-w-0">
+                  <div className="flex items-center justify-between text-[#434655] mb-2 gap-2">
+                    <span className="text-xs uppercase font-semibold tracking-wider truncate">Total Volume (24h)</span>
+                    <span className="material-symbols-outlined text-[20px] text-blue-600 shrink-0">payments</span>
                   </div>
                   <div>
-                    <div className="text-2xl font-bold text-[#191c1e] font-mono">$1,248,590.00</div>
-                    <div className="flex items-center gap-1 text-xs text-emerald-700 mt-1 font-medium">
-                      <span className="material-symbols-outlined text-[14px]">trending_up</span>
-                      +12.4% from yesterday
+                    <div className="text-2xl font-bold text-[#191c1e] font-mono tracking-tight truncate">$1,248,590.00</div>
+                    <div className="flex items-center gap-1.5 text-xs text-emerald-700 mt-1 font-medium flex-wrap">
+                      <span className="material-symbols-outlined text-[14px] shrink-0">trending_up</span>
+                      <span>+12.4% from yesterday</span>
+                      <span className="text-[10px] text-[#737686] bg-slate-100 px-1.5 py-0.5 rounded border border-[#e1e2e4] font-normal">Simulated</span>
                     </div>
                   </div>
                 </div>
 
-                <div className="bg-white border border-[#e1e2e4] p-5 rounded-xl shadow-xs flex flex-col justify-between">
-                  <div className="flex items-center justify-between text-[#434655] mb-2">
-                    <span className="text-xs uppercase font-semibold tracking-wider">Flagged Risk Events</span>
-                    <span className="material-symbols-outlined text-[20px] text-rose-600">gpp_bad</span>
+                <div className="bg-white border border-[#e1e2e4] p-5 rounded-xl shadow-xs flex flex-col justify-between min-w-0">
+                  <div className="flex items-center justify-between text-[#434655] mb-2 gap-2">
+                    <span className="text-xs uppercase font-semibold tracking-wider truncate">Flagged Risk Events</span>
+                    <span className="material-symbols-outlined text-[20px] text-rose-600 shrink-0">gpp_bad</span>
                   </div>
                   <div>
-                    <div className="text-2xl font-bold text-[#191c1e] font-mono">142</div>
-                    <div className="flex items-center gap-1 text-xs text-rose-700 mt-1 font-medium">
-                      <span className="material-symbols-outlined text-[14px]">warning</span>
-                      Requires immediate review
+                    <div className="text-2xl font-bold text-[#191c1e] font-mono tracking-tight truncate">142</div>
+                    <div className="flex items-center gap-1.5 text-xs text-rose-700 mt-1 font-medium flex-wrap">
+                      <span className="material-symbols-outlined text-[14px] shrink-0">warning</span>
+                      <span>Requires review</span>
+                      <span className="text-[10px] text-[#737686] bg-slate-100 px-1.5 py-0.5 rounded border border-[#e1e2e4] font-normal">Demo</span>
                     </div>
                   </div>
                 </div>
 
-                <div className="bg-white border border-[#e1e2e4] p-5 rounded-xl shadow-xs flex flex-col justify-between">
-                  <div className="flex items-center justify-between text-[#434655] mb-2">
-                    <span className="text-xs uppercase font-semibold tracking-wider">Auto-Cleared</span>
-                    <span className="material-symbols-outlined text-[20px] text-emerald-600">verified_user</span>
+                <div className="bg-white border border-[#e1e2e4] p-5 rounded-xl shadow-xs flex flex-col justify-between min-w-0">
+                  <div className="flex items-center justify-between text-[#434655] mb-2 gap-2">
+                    <span className="text-xs uppercase font-semibold tracking-wider truncate">Auto-Cleared</span>
+                    <span className="material-symbols-outlined text-[20px] text-emerald-600 shrink-0">verified_user</span>
                   </div>
                   <div>
-                    <div className="text-2xl font-bold text-[#191c1e] font-mono">8,924</div>
-                    <div className="flex items-center gap-1 text-xs text-emerald-700 mt-1 font-medium">
-                      <span className="material-symbols-outlined text-[14px]">check_circle</span>
-                      98.4% clearance rate
+                    <div className="text-2xl font-bold text-[#191c1e] font-mono tracking-tight truncate">8,924</div>
+                    <div className="flex items-center gap-1.5 text-xs text-emerald-700 mt-1 font-medium flex-wrap">
+                      <span className="material-symbols-outlined text-[14px] shrink-0">check_circle</span>
+                      <span>98.4% clearance rate</span>
+                      <span className="text-[10px] text-[#737686] bg-slate-100 px-1.5 py-0.5 rounded border border-[#e1e2e4] font-normal">Demo</span>
                     </div>
                   </div>
                 </div>
 
-                <div className="bg-white border border-[#e1e2e4] p-5 rounded-xl shadow-xs flex flex-col justify-between">
-                  <div className="flex items-center justify-between text-[#434655] mb-2">
-                    <span className="text-xs uppercase font-semibold tracking-wider">Avg Risk Score</span>
-                    <span className="material-symbols-outlined text-[20px] text-amber-600">analytics</span>
+                <div className="bg-white border border-[#e1e2e4] p-5 rounded-xl shadow-xs flex flex-col justify-between min-w-0">
+                  <div className="flex items-center justify-between text-[#434655] mb-2 gap-2">
+                    <span className="text-xs uppercase font-semibold tracking-wider truncate">Avg Risk Score</span>
+                    <span className="material-symbols-outlined text-[20px] text-amber-600 shrink-0">analytics</span>
                   </div>
                   <div>
-                    <div className="text-2xl font-bold text-[#191c1e] font-mono">18.4 / 100</div>
-                    <div className="flex items-center gap-1 text-xs text-[#434655] mt-1 font-medium">
-                      <span className="material-symbols-outlined text-[14px]">shield</span>
-                      Stable baseline
+                    <div className="text-2xl font-bold text-[#191c1e] font-mono tracking-tight truncate">18.4 / 100</div>
+                    <div className="flex items-center gap-1.5 text-xs text-[#434655] mt-1 font-medium flex-wrap">
+                      <span className="material-symbols-outlined text-[14px] shrink-0">shield</span>
+                      <span>Stable baseline</span>
+                      <span className="text-[10px] text-[#737686] bg-slate-100 px-1.5 py-0.5 rounded border border-[#e1e2e4] font-normal">Simulated</span>
                     </div>
                   </div>
                 </div>
@@ -2484,16 +2520,16 @@ export default function App() {
             <div className="space-y-6">
               {/* Header (matches prototype) */}
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div>
-                  <h1 className="text-2xl font-bold text-[#191c1e] tracking-tight">Audit &amp; system logs</h1>
-                  <p className="text-sm text-[#434655] mt-1">
+                <div className="min-w-0 flex-1">
+                  <h1 className="text-2xl font-bold text-[#191c1e] tracking-tight break-words">Audit &amp; system logs</h1>
+                  <p className="text-sm text-[#434655] mt-1 break-words">
                     Comprehensive audit trail, SHA-256 cryptographic verification, and real-time node synchronization status.
                   </p>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap shrink-0">
                   <button
-                    onClick={() => window.open('/api/audit/export?format=csv', '_blank')}
-                    className="flex items-center gap-1.5 px-3.5 py-2 bg-white hover:bg-slate-50 text-[#191c1e] text-xs font-semibold rounded-lg border border-[#e1e2e4] shadow-xs transition-colors cursor-pointer"
+                    onClick={handleExportCsv}
+                    className="flex items-center gap-1.5 px-3.5 py-2 bg-white hover:bg-slate-50 text-[#191c1e] text-xs font-semibold rounded-lg border border-[#e1e2e4] shadow-xs transition-colors cursor-pointer shrink-0"
                   >
                     <span className="material-symbols-outlined text-[16px]">download</span> Export Ledger
                   </button>
@@ -2505,7 +2541,7 @@ export default function App() {
                           setActionAlert(`Cryptographic Chain Verified: ${data.valid}/${data.total} records match SHA-256 signatures. Zero tampering.`);
                         });
                     }}
-                    className="flex items-center gap-1.5 px-3.5 py-2 bg-[#004ac6] hover:bg-[#003ea8] text-white text-xs font-semibold rounded-lg shadow-sm transition-colors cursor-pointer"
+                    className="flex items-center gap-1.5 px-3.5 py-2 bg-[#004ac6] hover:bg-[#003ea8] text-white text-xs font-semibold rounded-lg shadow-sm transition-colors cursor-pointer shrink-0"
                   >
                     <span className="material-symbols-outlined text-[16px]">verified</span> Verify Chain
                   </button>
@@ -2513,16 +2549,16 @@ export default function App() {
               </div>
 
               {/* Top 4 Metrics Strip (matches prototype) */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
                 {/* Metric 1 */}
-                <div className="p-5 bg-white border border-[#e1e2e4] rounded-xl shadow-xs flex flex-col justify-between">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs font-semibold text-[#434655]">Active Integrity Status</span>
-                    <span className="material-symbols-outlined text-emerald-600 text-[20px]">security</span>
+                <div className="p-5 bg-white border border-[#e1e2e4] rounded-xl shadow-xs flex flex-col justify-between min-w-0">
+                  <div className="flex items-center justify-between mb-2 gap-2">
+                    <span className="text-xs font-semibold text-[#434655] truncate">Active Integrity Status</span>
+                    <span className="material-symbols-outlined text-emerald-600 text-[20px] shrink-0">security</span>
                   </div>
                   <div className="flex items-baseline gap-2">
-                    <span className="text-2xl font-bold text-[#191c1e]">Verified</span>
-                    <span className="text-xs text-emerald-700 font-semibold font-mono">SHA-256</span>
+                    <span className="text-2xl font-bold text-[#191c1e] truncate">Verified</span>
+                    <span className="text-xs text-emerald-700 font-semibold font-mono shrink-0">SHA-256</span>
                   </div>
                   <div className="mt-3 w-full bg-[#edeef0] h-1.5 rounded-full overflow-hidden">
                     <div className="bg-emerald-600 h-full w-full rounded-full"></div>
@@ -2530,14 +2566,14 @@ export default function App() {
                 </div>
 
                 {/* Metric 2 */}
-                <div className="p-5 bg-white border border-[#e1e2e4] rounded-xl shadow-xs flex flex-col justify-between">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs font-semibold text-[#434655]">Node Synchronization</span>
-                    <span className="material-symbols-outlined text-blue-600 text-[20px]">sync</span>
+                <div className="p-5 bg-white border border-[#e1e2e4] rounded-xl shadow-xs flex flex-col justify-between min-w-0">
+                  <div className="flex items-center justify-between mb-2 gap-2">
+                    <span className="text-xs font-semibold text-[#434655] truncate">Node Synchronization</span>
+                    <span className="material-symbols-outlined text-blue-600 text-[20px] shrink-0">sync</span>
                   </div>
                   <div className="flex items-baseline gap-2">
-                    <span className="text-2xl font-bold text-[#191c1e]">100%</span>
-                    <span className="text-xs text-blue-700 font-semibold font-mono">12/12 Nodes</span>
+                    <span className="text-2xl font-bold text-[#191c1e] truncate">100%</span>
+                    <span className="text-xs text-blue-700 font-semibold font-mono shrink-0">12/12 Nodes</span>
                   </div>
                   <div className="mt-3 w-full bg-[#edeef0] h-1.5 rounded-full overflow-hidden">
                     <div className="bg-blue-600 h-full w-full rounded-full"></div>
@@ -2545,14 +2581,14 @@ export default function App() {
                 </div>
 
                 {/* Metric 3 */}
-                <div className="p-5 bg-white border border-[#e1e2e4] rounded-xl shadow-xs flex flex-col justify-between">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs font-semibold text-[#434655]">API Latency</span>
-                    <span className="material-symbols-outlined text-amber-600 text-[20px]">bolt</span>
+                <div className="p-5 bg-white border border-[#e1e2e4] rounded-xl shadow-xs flex flex-col justify-between min-w-0">
+                  <div className="flex items-center justify-between mb-2 gap-2">
+                    <span className="text-xs font-semibold text-[#434655] truncate">API Latency</span>
+                    <span className="material-symbols-outlined text-amber-600 text-[20px] shrink-0">bolt</span>
                   </div>
                   <div className="flex items-baseline gap-2">
-                    <span className="text-2xl font-bold text-[#191c1e]">24ms</span>
-                    <span className="text-xs text-emerald-700 font-semibold">-4ms avg</span>
+                    <span className="text-2xl font-bold text-[#191c1e] truncate">24ms</span>
+                    <span className="text-xs text-emerald-700 font-semibold shrink-0">-4ms avg</span>
                   </div>
                   <div className="mt-3 w-full bg-[#edeef0] h-1.5 rounded-full overflow-hidden">
                     <div className="bg-amber-600 h-full w-4/5 rounded-full"></div>
@@ -2560,14 +2596,14 @@ export default function App() {
                 </div>
 
                 {/* Metric 4 */}
-                <div className="p-5 bg-white border border-[#e1e2e4] rounded-xl shadow-xs flex flex-col justify-between">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs font-semibold text-[#434655]">Security Enclave</span>
-                    <span className="material-symbols-outlined text-[#191c1e] text-[20px]">lock</span>
+                <div className="p-5 bg-white border border-[#e1e2e4] rounded-xl shadow-xs flex flex-col justify-between min-w-0">
+                  <div className="flex items-center justify-between mb-2 gap-2">
+                    <span className="text-xs font-semibold text-[#434655] truncate">Security Enclave</span>
+                    <span className="material-symbols-outlined text-[#191c1e] text-[20px] shrink-0">lock</span>
                   </div>
                   <div className="flex items-baseline gap-2">
-                    <span className="text-2xl font-bold text-[#191c1e]">HSM Active</span>
-                    <span className="text-xs text-[#434655] font-semibold">Enterprise</span>
+                    <span className="text-2xl font-bold text-[#191c1e] truncate">HSM Active</span>
+                    <span className="text-xs text-[#434655] font-semibold shrink-0">Enterprise</span>
                   </div>
                   <div className="mt-3 w-full bg-[#edeef0] h-1.5 rounded-full overflow-hidden">
                     <div className="bg-[#191c1e] h-full w-full rounded-full"></div>
@@ -2581,8 +2617,8 @@ export default function App() {
                   <h2 className="text-sm font-bold text-[#191c1e]">System Health &amp; Integration Status</h2>
                   <span className="text-xs text-[#434655]">Real-time Telemetry</span>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                  <div className="p-4 bg-white border border-[#e1e2e4] rounded-xl shadow-xs flex flex-col justify-between gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+                  <div className="p-4 bg-white border border-[#e1e2e4] rounded-xl shadow-xs flex flex-col justify-between gap-3 min-w-0">
                     <div className="flex items-start justify-between">
                       <div className="flex items-center gap-2.5">
                         <div className="w-9 h-9 rounded-lg bg-blue-50 text-blue-700 flex items-center justify-center">
@@ -2604,18 +2640,18 @@ export default function App() {
                     </div>
                   </div>
 
-                  <div className="p-4 bg-white border border-[#e1e2e4] rounded-xl shadow-xs flex flex-col justify-between gap-3">
+                  <div className="p-4 bg-white border border-[#e1e2e4] rounded-xl shadow-xs flex flex-col justify-between gap-3 min-w-0">
                     <div className="flex items-start justify-between">
                       <div className="flex items-center gap-2.5">
-                        <div className="w-9 h-9 rounded-lg bg-blue-50 text-blue-700 flex items-center justify-center">
+                        <div className="w-9 h-9 rounded-lg bg-blue-50 text-blue-700 flex items-center justify-center shrink-0">
                           <span className="material-symbols-outlined text-[20px]">hub</span>
                         </div>
-                        <div>
-                          <h3 className="text-xs font-bold text-[#191c1e]">PayPal Gateway</h3>
+                        <div className="truncate">
+                          <h3 className="text-xs font-bold text-[#191c1e] truncate">PayPal Gateway</h3>
                           <span className="text-[10px] text-[#434655]">REST API v2</span>
                         </div>
                       </div>
-                      <span className="flex h-2 w-2 relative">
+                      <span className="flex h-2 w-2 relative shrink-0">
                         <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                         <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
                       </span>
@@ -2626,18 +2662,18 @@ export default function App() {
                     </div>
                   </div>
 
-                  <div className="p-4 bg-white border border-[#e1e2e4] rounded-xl shadow-xs flex flex-col justify-between gap-3">
+                  <div className="p-4 bg-white border border-[#e1e2e4] rounded-xl shadow-xs flex flex-col justify-between gap-3 min-w-0">
                     <div className="flex items-start justify-between">
                       <div className="flex items-center gap-2.5">
-                        <div className="w-9 h-9 rounded-lg bg-blue-50 text-blue-700 flex items-center justify-center">
+                        <div className="w-9 h-9 rounded-lg bg-blue-50 text-blue-700 flex items-center justify-center shrink-0">
                           <span className="material-symbols-outlined text-[20px]">group</span>
                         </div>
-                        <div>
-                          <h3 className="text-xs font-bold text-[#191c1e]">Multi-Agent Fleet</h3>
+                        <div className="truncate">
+                          <h3 className="text-xs font-bold text-[#191c1e] truncate">Multi-Agent Fleet</h3>
                           <span className="text-[10px] text-[#434655]">4 Autonomous Agents</span>
                         </div>
                       </div>
-                      <span className="flex h-2 w-2 relative">
+                      <span className="flex h-2 w-2 relative shrink-0">
                         <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                         <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
                       </span>
@@ -2648,18 +2684,18 @@ export default function App() {
                     </div>
                   </div>
 
-                  <div className="p-4 bg-white border border-[#e1e2e4] rounded-xl shadow-xs flex flex-col justify-between gap-3">
+                  <div className="p-4 bg-white border border-[#e1e2e4] rounded-xl shadow-xs flex flex-col justify-between gap-3 min-w-0">
                     <div className="flex items-start justify-between">
                       <div className="flex items-center gap-2.5">
-                        <div className="w-9 h-9 rounded-lg bg-blue-50 text-blue-700 flex items-center justify-center">
+                        <div className="w-9 h-9 rounded-lg bg-blue-50 text-blue-700 flex items-center justify-center shrink-0">
                           <span className="material-symbols-outlined text-[20px]">enhanced_encryption</span>
                         </div>
-                        <div>
-                          <h3 className="text-xs font-bold text-[#191c1e]">Cryptographic Ledger</h3>
+                        <div className="truncate">
+                          <h3 className="text-xs font-bold text-[#191c1e] truncate">Cryptographic Ledger</h3>
                           <span className="text-[10px] text-[#434655]">SHA-256 Chained</span>
                         </div>
                       </div>
-                      <span className="flex h-2 w-2 relative">
+                      <span className="flex h-2 w-2 relative shrink-0">
                         <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                         <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
                       </span>

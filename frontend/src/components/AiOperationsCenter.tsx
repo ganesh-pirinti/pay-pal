@@ -72,20 +72,20 @@ export const AiOperationsCenter: React.FC<AiOperationsCenterProps> = ({
     <div className="space-y-6 text-slate-100">
       {/* Top Banner */}
       <div className="bg-gradient-to-r from-slate-900 via-indigo-950/40 to-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl flex flex-wrap items-center justify-between gap-4">
-        <div>
+        <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 mb-1">
             <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
             <span className="text-xs uppercase font-bold text-emerald-400 tracking-wider font-mono">
               Autonomous Agent Fleet Active
             </span>
           </div>
-          <h2 className="text-xl font-black text-white">AI Operations & Decision Control Center</h2>
-          <p className="text-xs text-slate-400 mt-1 max-w-2xl">
+          <h2 className="text-xl font-black text-white break-words">AI Operations & Decision Control Center</h2>
+          <p className="text-xs text-slate-400 mt-1 max-w-2xl break-words">
             Real-time multi-agent fleet telemetry, model confidence calibration, and shadow continuous learning pipeline.
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 shrink-0">
           {onOpenCopilot && (
             <button
               onClick={onOpenCopilot}
@@ -165,8 +165,8 @@ export const AiOperationsCenter: React.FC<AiOperationsCenterProps> = ({
             </p>
 
             {learningStatus && (
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 pt-2">
-                <div className="p-4 bg-slate-950/70 border border-slate-800 rounded-xl">
+              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 pt-2">
+                <div className="p-4 bg-slate-950/70 border border-slate-800 rounded-xl min-w-0">
                   <span className="text-xs text-slate-400 block mb-1">Shadow Model Status</span>
                   <span className="font-mono text-base font-bold text-emerald-400">
                     {learningStatus.shadowModelActive ? 'Active in Shadow' : 'Offline'}

@@ -357,7 +357,7 @@ export const InvestigationWorkspace: React.FC<InvestigationWorkspaceProps> = ({
           <>
             {/* Inspector Top Banner */}
             <div className="p-5 border-b border-slate-800 bg-slate-950/70 flex flex-wrap items-center justify-between gap-4">
-              <div className="space-y-1">
+              <div className="space-y-1 min-w-0 flex-1">
                 <div className="flex items-center gap-2.5 flex-wrap">
                   <h2 className="text-base font-bold text-white font-mono">{activeCase.caseId}</h2>
                   <span
@@ -378,11 +378,11 @@ export const InvestigationWorkspace: React.FC<InvestigationWorkspaceProps> = ({
                     SLA: {activeCase.slaDueHours || 24}h
                   </span>
                 </div>
-                <p className="text-xs text-slate-400 max-w-2xl">{activeCase.finalVerdict}</p>
+                <p className="text-xs text-slate-400 max-w-2xl break-words">{activeCase.finalVerdict}</p>
               </div>
 
               {/* Quick Actions in Header */}
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 shrink-0 flex-wrap">
                 {onOpenCopilot && (
                   <button
                     onClick={onOpenCopilot}

@@ -138,24 +138,24 @@ export const HumanReviewCenter: React.FC<HumanReviewCenterProps> = () => {
     <div className="space-y-6 animate-fadeIn">
       {/* Workspace Header */}
       <div className="p-6 rounded-2xl bg-gradient-to-r from-slate-900 via-indigo-950/40 to-slate-900 border border-slate-800 shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center space-x-2 mb-1.5">
-            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center space-x-2 mb-1.5 flex-wrap gap-y-1">
+            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 shrink-0">
               UNDERWRITER WORKSPACE
             </span>
-            <span className="px-2 py-0.5 rounded text-[10px] font-mono text-emerald-400 bg-emerald-950/40 border border-emerald-500/30">
+            <span className="px-2 py-0.5 rounded text-[10px] font-mono text-emerald-400 bg-emerald-950/40 border border-emerald-500/30 shrink-0">
               Role: Underwriter (RBAC Enforced)
             </span>
           </div>
-          <h1 className="text-xl font-bold text-white tracking-tight flex items-center gap-2">
+          <h1 className="text-xl font-bold text-white tracking-tight flex items-center gap-2 flex-wrap break-words">
             Human-in-the-Loop Review Center
           </h1>
-          <p className="text-xs text-slate-400 mt-1 max-w-2xl">
+          <p className="text-xs text-slate-400 mt-1 max-w-2xl break-words">
             Audit high-risk escalations, inspect empirical evidence, cross-reference longitudinal memory, and record manual overrides without balance holds.
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 shrink-0">
           <button
             onClick={() => fetchCases()}
             disabled={loading}

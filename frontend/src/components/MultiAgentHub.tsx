@@ -285,25 +285,25 @@ export const MultiAgentHub: React.FC<MultiAgentHubProps> = () => {
       {/* Hero Header */}
       <div className="p-6 rounded-2xl bg-gradient-to-r from-blue-950/60 via-slate-900 to-indigo-950/60 border border-blue-500/20 shadow-xl backdrop-blur">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-          <div>
-            <div className="flex items-center space-x-3 mb-2">
-              <span className="px-3 py-1 text-xs font-bold rounded-full bg-blue-500/20 text-blue-300 border border-blue-500/30 flex items-center gap-1.5">
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center space-x-3 mb-2 flex-wrap gap-y-1">
+              <span className="px-3 py-1 text-xs font-bold rounded-full bg-blue-500/20 text-blue-300 border border-blue-500/30 flex items-center gap-1.5 shrink-0">
                 <span className="w-2 h-2 rounded-full bg-blue-400 animate-pulse"></span>
                 MULTI-AGENT COOPERATIVE INTELLIGENCE
               </span>
-              <span className="px-2.5 py-0.5 text-xs font-semibold rounded bg-slate-800 text-slate-300 border border-slate-700">
+              <span className="px-2.5 py-0.5 text-xs font-semibold rounded bg-slate-800 text-slate-300 border border-slate-700 shrink-0">
                 4 Autonomous Agents
               </span>
             </div>
-            <h1 className="text-2xl font-bold tracking-tight text-white flex items-center gap-2">
+            <h1 className="text-2xl font-bold tracking-tight text-white flex items-center gap-2 flex-wrap break-words">
               Agentic Fraud Investigation & Case Management
             </h1>
-            <p className="text-sm text-slate-300 mt-1 max-w-3xl leading-relaxed">
+            <p className="text-sm text-slate-300 mt-1 max-w-3xl leading-relaxed break-words">
               Four specialized AI agents collaborate through an orchestration engine: evaluating seller velocity, detecting Account Takeovers (ATO), inspecting invoice threats, defending against prompt injections, and synthesizing evidence into an auditable case report with Human-in-the-Loop review.
             </p>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 shrink-0">
             <button
               onClick={() => handleRunInvestigation()}
               disabled={loading}
@@ -330,7 +330,7 @@ export const MultiAgentHub: React.FC<MultiAgentHubProps> = () => {
         </div>
 
         {/* 4 Agent Status Badges */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-6 pt-5 border-t border-slate-800">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mt-6 pt-5 border-t border-slate-800">
           <div className="p-2.5 rounded-lg bg-slate-900/90 border border-slate-800 flex items-center space-x-2.5">
             <div className="w-8 h-8 rounded-lg bg-blue-500/20 border border-blue-500/30 flex items-center justify-center text-sm font-bold text-blue-400">
               1
@@ -726,7 +726,7 @@ export const MultiAgentHub: React.FC<MultiAgentHubProps> = () => {
                       <label className="text-xs font-bold text-slate-200 block">
                         Record Human Underwriter Decision
                       </label>
-                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 text-xs">
                         {(['Approve Standard Flow', 'Request Additional Documentation', 'Place on 48h Rolling Monitor', 'Escalate to Compliance Specialist'] as const).map(action => (
                           <button
                             key={action}

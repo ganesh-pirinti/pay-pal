@@ -140,9 +140,11 @@ export const CopilotDrawer: React.FC<CopilotDrawerProps> = ({
         {/* Drawer Header */}
         <div className="p-4 border-b border-[#e1e2e4] bg-[#f8f9fb] flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center text-white shadow-sm">
-              <span className="material-symbols-outlined text-[18px]">smart_toy</span>
-            </div>
+            <img
+              src="/trustshield-logo.jpg"
+              alt="TrustShield Logo"
+              className="w-8 h-8 rounded-lg object-cover shadow-sm shrink-0 border border-blue-200"
+            />
             <div>
               <h3 className="text-sm font-bold text-[#191c1e] flex items-center gap-2">
                 TrustShield Copilot

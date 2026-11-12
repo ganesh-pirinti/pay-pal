@@ -26,7 +26,7 @@ Comprehensive specifications are available in the [`docs/`](file:///c:/Users/Abh
 | **Enterprise Security** | [`docs/SECURITY.md`](file:///c:/Users/Abhi/Desktop/my%20paypal/docs/SECURITY.md) | OWASP Top 10, Zero-client secret boundary, prompt injection defense |
 | **AI & Decision Science** | [`docs/AI_DESIGN.md`](file:///c:/Users/Abhi/Desktop/my%20paypal/docs/AI_DESIGN.md) | Brier score, ECE calibration, WoE evidence ranking, hypotheses |
 | **REST API Reference** | [`docs/API_DOCS.md`](file:///c:/Users/Abhi/Desktop/my%20paypal/docs/API_DOCS.md) | Endpoints, request schemas, RBAC headers, response models |
-| **Testing Guide** | [`docs/TESTING_GUIDE.md`](file:///c:/Users/Abhi/Desktop/my%20paypal/docs/TESTING_GUIDE.md) | 12 Vitest suites, 100 passing tests, mathematical benchmark |
+| **Testing Guide** | [`docs/TESTING_GUIDE.md`](file:///c:/Users/Abhi/Desktop/my%20paypal/docs/TESTING_GUIDE.md) | 12 Vitest suites, 101 passing tests, mathematical benchmark |
 | **Deployment Guide** | [`docs/DEPLOYMENT_GUIDE.md`](file:///c:/Users/Abhi/Desktop/my%20paypal/docs/DEPLOYMENT_GUIDE.md) | Multi-stage Dockerfile, docker-compose, Kubernetes manifests |
 | **Judge Evaluation Guide** | [`docs/JUDGE_GUIDE.md`](file:///c:/Users/Abhi/Desktop/my%20paypal/docs/JUDGE_GUIDE.md) | 5-minute judge walkthrough, why PayPal should build this |
 | **Developer Guide** | [`docs/DEVELOPER_GUIDE.md`](file:///c:/Users/Abhi/Desktop/my%20paypal/docs/DEVELOPER_GUIDE.md) | Local setup, contributing guidelines, coding conventions |
@@ -64,7 +64,7 @@ my paypal/
 │   │   ├── validation.ts         # Zod schemas for input validation & bounds checking
 │   │   ├── summary.ts            # Mock dashboard analytics labeled as simulated data
 │   │   └── server.ts             # Express REST API with error handling middleware
-│   ├── tests/                    # Vitest & Supertest automated test suites (100 tests across 12 suites)
+│   ├── tests/                    # Vitest & Supertest automated test suites (101 tests across 12 suites)
 │   │   ├── agentSystem.test.ts             # Agent 1, 2, 3, 4 individual logic & tool selection
 │   │   ├── orchestrator.test.ts            # Multi-agent coordination, memory & HITL tests
 │   │   ├── agentEdgeCases.test.ts          # Adversarial injection, malicious invoices & conflicts
@@ -279,7 +279,7 @@ You can thoroughly test and inspect every analytical, multi-agent, and decision-
 
 | Dimension | Verification Status | Implementation Details & Behavioral Truth |
 | :--- | :---: | :--- |
-| **Deterministic Risk Engines** | **VERIFIED** | 100% functional without external keys. Implemented in [`backend/src/riskEngine.ts`](backend/src/riskEngine.ts); verified via 100 automated tests. |
+| **Deterministic Risk Engines** | **VERIFIED** | 100% functional without external keys. Implemented in [`backend/src/riskEngine.ts`](backend/src/riskEngine.ts); verified via 101 automated tests. |
 | **Prompt Injection Quarantine** | **VERIFIED** | Intercepts adversarial subversion tokens (`SYSTEM PROMPT OVERRIDE`) and quarantines input as untrusted text. |
 | **4-Agent Collective** | **VERIFIED** | 4 autonomous agents (`Fraud`, `Invoice`, `Merchant`, `Case Manager`) coordinate via `AgentOrchestrator` with tool logging and HITL queue. |
 | **Platt Scaling & WoE Ranking** | **VERIFIED** | Mathematical probability calibration ($ECE < 4.2\%$) and log-odds evidence ranking implemented in [`backend/src/ai/`](backend/src/ai/). |
@@ -291,9 +291,9 @@ You can thoroughly test and inspect every analytical, multi-agent, and decision-
 
 ---
 
-## 📊 Evaluation & Benchmark Report (100/100 Tests Passing Across 12 Suites)
+## 📊 Evaluation & Benchmark Report (101/101 Tests Passing Across 12 Suites)
 
-TrustShield AI features 100 automated tests across 12 comprehensive test suites:
+TrustShield AI features 101 automated tests across 12 comprehensive test suites:
 
 ### 1. Benchmark Detection Metrics (Ground Truth Verification)
 | Risk Engine Domain | True Positives | False Positives | True Negatives | False Negatives | Precision | Recall | False Positive Rate (FPR) |
@@ -301,7 +301,7 @@ TrustShield AI features 100 automated tests across 12 comprehensive test suites:
 | **Seller Protection Engine** | 3 | 0 | 5 | 0 | **100.0%** | **100.0%** | **0.0%** |
 | **Invoice Scam Shield** | 5 | 0 | 5 | 0 | **100.0%** | **100.0%** | **0.0%** |
 
-### 2. Test Suite Breakdown (100/100 Passing Across 12 Suites)
+### 2. Test Suite Breakdown (101/101 Passing Across 12 Suites)
 - **`agentSystem.test.ts` (9 tests):**
   - Fraud Investigation Agent: ATO detection, ticket acceleration, low-confidence evidence requests.
   - Invoice Intelligence Agent: Impersonation, unverified numbers, urgency, payment diversion, B2B clearance.
@@ -325,7 +325,7 @@ TrustShield AI features 100 automated tests across 12 comprehensive test suites:
   - Contradiction detector for opposing indicators (0% disputes vs 300% spike with unverified buyers).
   - Grounded Copilot assistant with anti-hallucination citations and underwriting memos.
   - Underwriter notes and continuous learning human feedback loop.
-- **`graphAndIntelligence.test.ts` (14 tests):**
+- **`graphAndIntelligence.test.ts` (15 tests):**
   - Entity relationship network graphs (merchant, bank, IP, buyer clusters).
   - 90-day risk evolution curve with trust score drift.
   - Simulated temporal/geographic fraud heatmap with explicit simulation labeling.
